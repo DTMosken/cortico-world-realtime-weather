@@ -69,6 +69,17 @@ describe('demo文案与部署覆盖', () => {
     expect(text).toContain('听到手机震了一下，低头扫了一眼弹出的提醒，');
     expect(text.match(/\[/g)).toHaveLength(1);
   });
+  it('通用视程句只在没有专用条件时选中', () => {
+    const { file } = create();
+    const copy = new Ambience(file, () => 0.999);
+    const render = (tags: string[]) => copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', tags);
+    expect(render(['visibilityUp', 'fogPresent'])).toContain('空气里依然还飘着一层薄薄的雾');
+    expect(render(['visibilityUp', 'wasWaterFog'])).toContain('浓雾终于散开');
+    expect(render(['visibilityDown', 'waterFog'])).toContain('白茫茫的水汽');
+    expect(render(['visibilityDown', 'noFog'])).toContain('景物的边缘');
+    expect(render(['visibilityUp'])).toContain('之前看着有些模糊的远处景物');
+    expect(render(['visibilityDown'])).toContain('稍远一点的建筑和街景');
+  });
   it('UV极值候选在随机数接近1时也优先于普通句', () => {
     const { file } = create();
     const copy = new Ambience(file, () => 0.999);
