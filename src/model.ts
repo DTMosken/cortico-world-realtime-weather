@@ -1,0 +1,90 @@
+export interface Weather {
+  conditionCode: string;
+  condition: string;
+  temperature?: number;
+  feelsLike?: number;
+  humidity?: number;
+  windScale?: number;
+  windDirection?: string;
+  precipitationType?: string;
+  precipitationIntensity?: number;
+  precipitationAmount?: number;
+  precipitationProbability?: number;
+  visibilityKm?: number;
+  uv?: number;
+}
+export interface Hour extends Weather { at: string }
+export interface Day {
+  date: string;
+  daytime: Weather;
+  nighttime: Weather;
+  min?: number;
+  max?: number;
+  uv?: number;
+}
+export interface Air {
+  at: string;
+  standard: string;
+  value: string;
+  level: number;
+  category: string;
+  primary?: string;
+  pm25?: number;
+}
+export interface Alert {
+  id: string;
+  event: string;
+  severity: string;
+  color?: string;
+  urgency?: string;
+  certainty?: string;
+  issuedAt?: string;
+  effectiveAt?: string;
+  onsetAt?: string;
+  expiresAt?: string;
+  kind: string;
+  supersedes: string[];
+}
+export interface Current {
+  at: string;
+  weather?: Weather;
+  air?: Air;
+  alerts: Alert[];
+  errors: Partial<Record<'weather' | 'air' | 'alerts', string>>;
+}
+export interface Forecast {
+  at: string;
+  hours: Hour[];
+  days: Day[];
+  errors: Partial<Record<'hours' | 'days', string>>;
+}
+export interface Change { id: string; text: string }
+
+export function uvLevel(value: number): number {
+  return value < 3 ? 0 : value < 6 ? 1 : value < 8 ? 2 : value < 11 ? 3 : 4;
+}
+export const UV_NAMES = ['低', '中等', '高', '很高', '极高'];
+export function alertGrade(alert: Alert): string {
+  const colors: Record<string, string> = { red: '红色', orange: '橙色', yellow: '黄色', blue: '蓝色', green: '绿色', white: '白色', black: '黑色', amber: '琥珀色', purple: '紫色', gray: '灰色' };
+  const severity: Record<string, string> = { extreme: '极端', severe: '严重', moderate: '中等', minor: '轻微' };
+  return colors[alert.color ?? ''] ?? severity[alert.severity] ?? '';
+}
+
+export function weatherTags(w: Weather): string[] {
+  const code = Number(w.conditionCode);
+  const tags: string[] = [];
+  if (code === 100 || code === 150) tags.push('clear');
+  else if (code >= 101 && code <= 104 || code >= 151 && code <= 154) tags.push('cloudy');
+  if (w.precipitationType === 'rain') tags.push('rain', (w.precipitationIntensity ?? 0) < 2.5 ? 'lightRain' : 'heavyRain');
+  if (w.precipitationType === 'snow') tags.push('snow', code >= 402 && code <= 410 ? 'heavySnow' : 'lightSnow');
+  if (w.precipitationType === 'mixed') tags.push('mixed');
+  if ([302, 303, 304].includes(code)) tags.push('thunder');
+  if ([501, 509, 510, 514, 515].includes(code)) tags.push('fog');
+  if ([502, 511, 512, 513].includes(code)) tags.push('haze');
+  if ([503, 504, 507, 508].includes(code)) tags.push('dust');
+  if ((w.windScale ?? 0) >= 5) tags.push('windy');
+  if ((w.feelsLike ?? Infinity) < 0) tags.push('freezing');
+  if ((w.temperature ?? -Infinity) > 32 || (w.uv ?? 0) > 7) tags.push('hot');
+  if ((w.humidity ?? 0) > 0.8 && (w.temperature ?? 0) >= 28) tags.push('humidHot');
+  return tags;
+}

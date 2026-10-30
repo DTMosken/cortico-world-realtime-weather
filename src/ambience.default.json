@@ -1,0 +1,1031 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "current-active-1-morning",
+      "part": "opening",
+      "when": [
+        "current",
+        "active",
+        "morning"
+      ],
+      "texts": [
+        "带着点刚醒的困意走到窗边，拉开窗帘往外看了一眼，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-active-2-morning",
+      "part": "opening",
+      "when": [
+        "current",
+        "active",
+        "morning"
+      ],
+      "texts": [
+        "趁着早上空气清新，起身推开半扇窗感受了一下，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-active-3-day",
+      "part": "opening",
+      "when": [
+        "current",
+        "active",
+        "day"
+      ],
+      "texts": [
+        "停下手头的事，抬头往窗外望去，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-active-4-day",
+      "part": "opening",
+      "when": [
+        "current",
+        "active",
+        "day"
+      ],
+      "texts": [
+        "走到窗边，拨开窗帘确认了一下外面的情况，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-active-5-evening",
+      "part": "opening",
+      "when": [
+        "current",
+        "active",
+        "evening"
+      ],
+      "texts": [
+        "借着傍晚渐暗的天色，走到窗前看了一眼外面，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-active-6-night",
+      "part": "opening",
+      "when": [
+        "current",
+        "active",
+        "night"
+      ],
+      "texts": [
+        "走到玻璃窗前，往夜色里望了一眼，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-active-7-lateNight",
+      "part": "opening",
+      "when": [
+        "current",
+        "active",
+        "lateNight"
+      ],
+      "texts": [
+        "揉了揉有些发酸的眼睛，借着外面微弱的路灯光看了一眼窗外，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-passive-1-morning",
+      "part": "opening",
+      "when": [
+        "current",
+        "passive",
+        "morning"
+      ],
+      "texts": [
+        "刚清醒过来，就察觉到窗外的动静有些变化，转头看了一眼，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-passive-2-day",
+      "part": "opening",
+      "when": [
+        "current",
+        "passive",
+        "day"
+      ],
+      "texts": [
+        "正忙着，余光瞥见屋里的光线变了，下意识抬头望向窗外，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-passive-3-day",
+      "part": "opening",
+      "when": [
+        "current",
+        "passive",
+        "day"
+      ],
+      "texts": [
+        "被窗外传来的动静吸引，分神往外看了一眼，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-passive-4-evening",
+      "part": "opening",
+      "when": [
+        "current",
+        "passive",
+        "evening"
+      ],
+      "texts": [
+        "暮色里，突然感觉屋里的氛围有些变化，转头看向窗外，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-passive-5-night",
+      "part": "opening",
+      "when": [
+        "current",
+        "passive",
+        "night"
+      ],
+      "texts": [
+        "安静的夜里，听见窗外传来的声响，起身去窗边看了一眼，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "current-passive-6-lateNight",
+      "part": "opening",
+      "when": [
+        "current",
+        "passive",
+        "lateNight"
+      ],
+      "texts": [
+        "万籁俱寂中，被窗外细微的动静惊动，裹了裹衣服往外瞥了一眼，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "forecast-active-1-morning",
+      "part": "opening",
+      "when": [
+        "forecast",
+        "active",
+        "morning"
+      ],
+      "texts": [
+        "刚醒不久，摸过枕边的手机查了查今天的天气预报，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "forecast-active-2-day",
+      "part": "opening",
+      "when": [
+        "forecast",
+        "active",
+        "day"
+      ],
+      "texts": [
+        "顺手划开手机屏幕，翻了翻接下来的天气情况，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "forecast-active-2-evening",
+      "part": "opening",
+      "when": [
+        "forecast",
+        "active",
+        "evening"
+      ],
+      "texts": [
+        "顺手划开手机屏幕，翻了翻接下来的天气情况，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "forecast-active-3-night",
+      "part": "opening",
+      "when": [
+        "forecast",
+        "active",
+        "night"
+      ],
+      "texts": [
+        "睡前解锁手机，看了一眼明天的天气趋势，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "forecast-active-3-lateNight",
+      "part": "opening",
+      "when": [
+        "forecast",
+        "active",
+        "lateNight"
+      ],
+      "texts": [
+        "睡前解锁手机，看了一眼明天的天气趋势，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "forecast-passive-1-morning",
+      "part": "opening",
+      "when": [
+        "forecast",
+        "passive",
+        "morning"
+      ],
+      "texts": [
+        "早起洗漱完，瞥见手机桌面上弹出了一条提醒，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "forecast-passive-2-day",
+      "part": "opening",
+      "when": [
+        "forecast",
+        "passive",
+        "day"
+      ],
+      "texts": [
+        "听到手机震了一下，低头扫了一眼弹出的提醒，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "forecast-passive-2-evening",
+      "part": "opening",
+      "when": [
+        "forecast",
+        "passive",
+        "evening"
+      ],
+      "texts": [
+        "听到手机震了一下，低头扫了一眼弹出的提醒，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "forecast-passive-3-night",
+      "part": "opening",
+      "when": [
+        "forecast",
+        "passive",
+        "night"
+      ],
+      "texts": [
+        "安静的房间里手机屏幕突然亮了一下，跳出了一条提醒，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "forecast-passive-3-lateNight",
+      "part": "opening",
+      "when": [
+        "forecast",
+        "passive",
+        "lateNight"
+      ],
+      "texts": [
+        "安静的房间里手机屏幕突然亮了一下，跳出了一条提醒，"
+      ],
+      "priority": 0
+    },
+    {
+      "id": "body-current-clear-daylight-0",
+      "part": "body",
+      "when": [
+        "current",
+        "clear",
+        "daylight"
+      ],
+      "texts": [
+        "外面的阳光很好，是个让人心情舒畅的好天气。"
+      ],
+      "priority": 10
+    },
+    {
+      "id": "body-current-hot-daylight-0",
+      "part": "body",
+      "when": [
+        "current",
+        "hot",
+        "daylight"
+      ],
+      "texts": [
+        "外面的阳光很刺眼，热浪隔着玻璃都能感觉到，还是待在空调房里比较好。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-cloudy-0",
+      "part": "body",
+      "when": [
+        "current",
+        "cloudy"
+      ],
+      "texts": [
+        "天色阴沉沉的，厚重的云层压得很低。"
+      ],
+      "priority": 10
+    },
+    {
+      "id": "body-current-lightRain-0",
+      "part": "body",
+      "when": [
+        "current",
+        "lightRain"
+      ],
+      "texts": [
+        "外面飘着细密的雨丝，路面已经被润湿成了深色。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-heavyRain-0",
+      "part": "body",
+      "when": [
+        "current",
+        "heavyRain"
+      ],
+      "texts": [
+        "雨下得正急，雨点密集地敲打着玻璃窗。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-thunder-0",
+      "part": "body",
+      "when": [
+        "current",
+        "thunder"
+      ],
+      "texts": [
+        "窗外闪过一道白光，紧接着传来闷雷声，雨势很大。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-lightSnow-0",
+      "part": "body",
+      "when": [
+        "current",
+        "lightSnow"
+      ],
+      "texts": [
+        "窗外飘着细碎的雪粒，外面看起来湿冷泥泞。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-heavySnow-0",
+      "part": "body",
+      "when": [
+        "current",
+        "heavySnow"
+      ],
+      "texts": [
+        "鹅毛大雪无声地落下，窗外的世界正一点点变白，周围格外安静。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-fog-0",
+      "part": "body",
+      "when": [
+        "current",
+        "fog"
+      ],
+      "texts": [
+        "窗外白茫茫一片，远处的建筑都隐没在了雾气里。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-polluted-0",
+      "part": "body",
+      "when": [
+        "current",
+        "polluted"
+      ],
+      "texts": [
+        "外面灰蒙蒙的，空气看起来很浑浊，看了一眼窗外，决定还是不要开窗比较好。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-windy-0",
+      "part": "body",
+      "when": [
+        "current",
+        "windy"
+      ],
+      "texts": [
+        "外面刮起了大风，吹得树枝大幅度摇晃，窗户框都有些轻微作响。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-humidHot-0",
+      "part": "body",
+      "when": [
+        "current",
+        "humidHot"
+      ],
+      "texts": [
+        "外面的空气又湿又闷，稍微开了一会儿窗就觉得有些透不过气。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-freezing-0",
+      "part": "body",
+      "when": [
+        "current",
+        "freezing"
+      ],
+      "texts": [
+        "玻璃窗摸上去冰凉刺骨，窗户内侧都结了一层薄薄的白雾。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-mixed-0",
+      "part": "body",
+      "when": [
+        "current",
+        "mixed"
+      ],
+      "texts": [
+        "窗外飘着细碎的雪粒，外面看起来湿冷泥泞。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-fog-0",
+      "part": "body",
+      "when": [
+        "current",
+        "fog"
+      ],
+      "texts": [
+        "窗外白茫茫一片，远处的建筑都隐没在了雾气里。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "body-current-becameCloudy-daylight-0",
+      "part": "body",
+      "when": [
+        "current",
+        "becameCloudy",
+        "daylight"
+      ],
+      "texts": [
+        "刚才还亮堂堂的阳光暗了下去，大片云层正遮过来。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-current-becameClear-daylight-0",
+      "part": "body",
+      "when": [
+        "current",
+        "becameClear",
+        "daylight"
+      ],
+      "texts": [
+        "压抑的云层散开了，阳光重新照进屋里。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-current-rainStarted-0",
+      "part": "body",
+      "when": [
+        "current",
+        "rainStarted"
+      ],
+      "texts": [
+        "空气里的湿气重了起来，雨点开始啪嗒啪嗒地砸在窗户上，赶紧起身把窗关小了些。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-current-rainStronger-0",
+      "part": "body",
+      "when": [
+        "current",
+        "rainStronger"
+      ],
+      "texts": [
+        "外面的雨声突然变响了，雨势比刚才急促了不少。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-current-rainWeaker-0",
+      "part": "body",
+      "when": [
+        "current",
+        "rainWeaker"
+      ],
+      "texts": [
+        "敲打窗户的雨声渐渐小了，只剩下屋檐还在滴水。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-current-rainStopped-0",
+      "part": "body",
+      "when": [
+        "current",
+        "rainStopped"
+      ],
+      "texts": [
+        "雨终于停了，推开窗，一股雨后潮湿清爽的空气扑面而来。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-current-snowStarted-0",
+      "part": "body",
+      "when": [
+        "current",
+        "snowStarted"
+      ],
+      "texts": [
+        "定睛一看，窗外居然开始飘雪花了。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-current-temperatureDown-0",
+      "part": "body",
+      "when": [
+        "current",
+        "temperatureDown"
+      ],
+      "texts": [
+        "温度比刚才降了不少，不禁缩了缩脖子，随手拿起了搭在椅背上的外套。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-current-airDown-0",
+      "part": "body",
+      "when": [
+        "current",
+        "airDown"
+      ],
+      "texts": [
+        "外面的能见度变差了，顺手关紧了窗户。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-current-feelsLikeDown-0",
+      "part": "body",
+      "when": [
+        "current",
+        "feelsLikeDown"
+      ],
+      "texts": [
+        "温度比刚才降了不少，不禁缩了缩脖子，随手拿起了搭在椅背上的外套。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-current-uvUp-highUv-daylight-0",
+      "part": "body",
+      "when": [
+        "current",
+        "uvUp",
+        "highUv",
+        "daylight"
+      ],
+      "texts": [
+        "外面的阳光变得格外毒辣，明晃晃地刺得人眼睛发酸，顺手把窗帘拉上了一半遮光。"
+      ],
+      "priority": 55
+    },
+    {
+      "id": "body-current-uvUp-highUv-daylight-1",
+      "part": "body",
+      "when": [
+        "current",
+        "uvUp",
+        "highUv",
+        "daylight"
+      ],
+      "texts": [
+        "太阳越升越高，照在窗台上的光线变得灼人起来，看来现在出门不涂防晒或者不打伞是不行了。"
+      ],
+      "priority": 55
+    },
+    {
+      "id": "body-current-uvDown-lowUv-daylight-0",
+      "part": "body",
+      "when": [
+        "current",
+        "uvDown",
+        "lowUv",
+        "daylight"
+      ],
+      "texts": [
+        "外面的日头终于没有刚才那么毒了，刺眼的强光褪去，光线变得柔和舒适了许多。"
+      ],
+      "priority": 55
+    },
+    {
+      "id": "body-current-uvDown-lowUv-daylight-1",
+      "part": "body",
+      "when": [
+        "current",
+        "uvDown",
+        "lowUv",
+        "daylight"
+      ],
+      "texts": [
+        "灼人的阳光收敛了不少，伸手拉开之前遮光的窗帘，让温和的自然光透进屋里。"
+      ],
+      "priority": 55
+    },
+    {
+      "id": "body-current-airUp-clearerAir-0",
+      "part": "body",
+      "when": [
+        "current",
+        "airUp",
+        "clearerAir"
+      ],
+      "texts": [
+        "外面的灰霾终于散干净了，远处的建筑轮廓重新变得清晰起来，果断关掉空气净化器，推开窗户痛快地换了口气。"
+      ],
+      "priority": 55
+    },
+    {
+      "id": "body-current-airUp-clearerAir-1",
+      "part": "body",
+      "when": [
+        "current",
+        "airUp",
+        "clearerAir"
+      ],
+      "texts": [
+        "原本浑浊的天空被风吹得干干净净，久违的清透感回来了，赶紧起身把屋里的窗户敞开通风。"
+      ],
+      "priority": 55
+    },
+    {
+      "id": "sunrise-1",
+      "part": "complete",
+      "when": [
+        "sunrise",
+        "clear"
+      ],
+      "texts": [
+        "天边刚刚泛起鱼肚白，艰难地在床上翻了个身，眯着眼看了一眼微亮的窗外。"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "sunrise-2",
+      "part": "complete",
+      "when": [
+        "sunrise",
+        "clear"
+      ],
+      "texts": [
+        "晨光刚刚刺破薄雾，第一缕阳光正落在窗台上，新的一天开始了。"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "sunrise-3",
+      "part": "complete",
+      "when": [
+        "sunrise"
+      ],
+      "texts": [
+        "听见窗外早起的鸟鸣，起身拉开窗帘，迎着初升的微光呼吸了一口清晨微凉的空气。"
+      ],
+      "priority": 1
+    },
+    {
+      "id": "sunrise-4",
+      "part": "complete",
+      "when": [
+        "sunrise",
+        "cloudyOrWet"
+      ],
+      "texts": [
+        "到了日出的时间，但窗外被厚重的云层（或雨雾）遮着，天色只是蒙蒙亮，屋里依然有些昏暗。"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "sunrise-5",
+      "part": "complete",
+      "when": [
+        "sunrise",
+        "freezing"
+      ],
+      "texts": [
+        "清晨的微光透进屋里，玻璃窗上结着一层薄薄的晨露，外面看起来清冷又安静。"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "sunset-1",
+      "part": "complete",
+      "when": [
+        "sunset",
+        "clear"
+      ],
+      "texts": [
+        "夕阳正一点点沉下去，把窗外的云层染成了好看的暖橘色，忍不住在窗边多看了一会儿。"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "sunset-2",
+      "part": "complete",
+      "when": [
+        "sunset"
+      ],
+      "texts": [
+        "太阳落山了，白天的燥热正在散去，看了一眼窗外渐暗的天色，起身打开了屋里的灯。"
+      ],
+      "priority": 1
+    },
+    {
+      "id": "sunset-3",
+      "part": "complete",
+      "when": [
+        "sunset",
+        "clear",
+        "calm"
+      ],
+      "texts": [
+        "暮色四合，最后一抹余晖正在天际线消失，晚风吹动窗帘，带来了一丝傍晚的凉意。"
+      ],
+      "priority": 3
+    },
+    {
+      "id": "sunset-4",
+      "part": "complete",
+      "when": [
+        "sunset",
+        "cloudyOrWet"
+      ],
+      "texts": [
+        "本来就是阴雨天，还没到日落的点，外面的天色就已经早早地黑透了，顺手拉上了窗帘。"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "sunset-5",
+      "part": "complete",
+      "when": [
+        "sunset",
+        "clear"
+      ],
+      "texts": [
+        "夕阳彻底隐没在远处的建筑后面，窗外的路灯和霓虹灯正一盏接一盏地亮起来。"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "forecast-3",
+      "part": "body",
+      "when": [
+        "forecastRain"
+      ],
+      "texts": [
+        "上面说一会儿要下雨，顺手把雨伞拿出来放在了门边。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "forecast-4",
+      "part": "body",
+      "when": [
+        "forecastRain"
+      ],
+      "texts": [
+        "看样子待会儿有雨，盘算着今天是不是先别洗衣服了。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "forecast-6",
+      "part": "body",
+      "when": [
+        "unsupportedNowcast"
+      ],
+      "texts": [
+        "软件上提示这阵雨马上就过去，看来不用太担心。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "forecast-8",
+      "part": "body",
+      "when": [
+        "forecastCold"
+      ],
+      "texts": [
+        "接下来的温度掉得厉害，寻思着出门得多穿件厚衣服，晚上也得加床被子。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "forecast-10",
+      "part": "body",
+      "when": [
+        "forecastWarm"
+      ],
+      "texts": [
+        "待会儿温度会升得很高，看来今天穿薄一点就行。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "forecast-12",
+      "part": "body",
+      "when": [
+        "forecastWet"
+      ],
+      "texts": [
+        "未来几天全都是雨滴图标，看来得做好和潮湿天气打持久战的准备了。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "forecast-14",
+      "part": "body",
+      "when": [
+        "forecastClear"
+      ],
+      "texts": [
+        "接下来几天都是大晴天，是个适合晒被子和出门的好时候。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "forecast-16",
+      "part": "body",
+      "when": [
+        "alertAdded"
+      ],
+      "texts": [
+        "刚挂出了[暴雨/大风/高温]预警，外面的情况可能不太妙，今天还是尽量待在屋里别乱跑了。"
+      ],
+      "priority": 20
+    },
+    {
+      "id": "alert-cancelled",
+      "part": "body",
+      "when": [
+        "alertCancelled"
+      ],
+      "texts": [
+        "之前挂着的[台风/暴雨/雷电/大风]预警总算解除了，悬着的心放了下来，紧绷的神经也跟着松快了不少。",
+        "上面的恶劣天气预警图标终于消失了，看了一眼逐渐恢复平静的窗外，看来最难熬的那阵子已经过去了。"
+      ],
+      "priority": 60
+    },
+    {
+      "id": "alert-downgraded",
+      "part": "body",
+      "when": [
+        "alertDowngraded"
+      ],
+      "texts": [
+        "预警信号降级了，外面的风声雨势也确实没有预想中那么吓人了，稍微松了一口气。"
+      ],
+      "priority": 60
+    },
+    {
+      "id": "alert-removed",
+      "part": "body",
+      "when": [
+        "alertRemoved"
+      ],
+      "texts": [
+        "之前挂着的[台风/暴雨/雷电/大风]预警总算解除了，悬着的心放了下来，紧绷的神经也跟着松快了不少。",
+        "上面的恶劣天气预警图标终于消失了，看了一眼逐渐恢复平静的窗外，看来最难熬的那阵子已经过去了。"
+      ],
+      "priority": 60
+    },
+    {
+      "id": "pending-snowStopped",
+      "part": "body",
+      "when": [
+        "snowStopped"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-snowStronger",
+      "part": "body",
+      "when": [
+        "snowStronger"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-snowWeaker",
+      "part": "body",
+      "when": [
+        "snowWeaker"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-windDown",
+      "part": "body",
+      "when": [
+        "windDown"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-temperatureUp",
+      "part": "body",
+      "when": [
+        "temperatureUp"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-feelsLikeUp",
+      "part": "body",
+      "when": [
+        "feelsLikeUp"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-visibilityUp",
+      "part": "body",
+      "when": [
+        "visibilityUp"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-visibilityDown",
+      "part": "body",
+      "when": [
+        "visibilityDown"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-alertExpired",
+      "part": "body",
+      "when": [
+        "alertExpired"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-probabilityUp",
+      "part": "body",
+      "when": [
+        "probabilityUp"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-probabilityDown",
+      "part": "body",
+      "when": [
+        "probabilityDown"
+      ],
+      "texts": [],
+      "priority": 50
+    }
+  ]
+}

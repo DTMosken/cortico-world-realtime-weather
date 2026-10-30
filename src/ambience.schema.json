@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "实时天气氛围文案",
+  "type": "object",
+  "required": ["version", "rules"],
+  "properties": {
+    "version": { "const": 1 },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "part", "when", "texts", "priority"],
+        "properties": {
+          "id": { "type": "string" },
+          "part": { "enum": ["opening", "body", "complete"] },
+          "when": { "type": "array", "items": { "type": "string" } },
+          "texts": { "type": "array", "items": { "type": "string" } },
+          "priority": { "type": "number" }
+        }
+      }
+    }
+  }
+}

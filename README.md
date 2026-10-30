@@ -1,0 +1,59 @@
+<!-- Owner: src/definition.ts, src/config.ts, src/world.ts, src/ambience.ts, src/ambience.schema.json -->
+# 实时天气
+
+Cortico World扩展，使用QWeather获取天气、空气质量、官方预警及预报。要求Node.js 22以上及World API 6。
+
+## 配置
+
+1. 从WebUI扩展页安装本包，在“实时天气”中填写QWeather控制台提供的API Host。
+2. “打开密钥文件”，在部署`.env`中填写`CORTICO_QWEATHER_API_KEY`并保存。
+3. 搜索城市，选择国家、省州和城市相符的结果；区级行政区可选。
+4. 启用World，“测试连接”显示各接口状态和耗时。
+
+密钥注册入口：https://id.qweather.com/ 。创建项目、添加API KEY凭据，API Host在控制台设置中查看。账号需要有对应接口的访问权限；HTTP错误在面板中显示。
+
+## 查询与事件
+
+- 初始化立即查询实况、空气质量、预警和预报。普通天气只建立基线，已有有效预警投递一次。
+- 实况每15分钟一轮：每轮查天气与预警，每4轮查空气质量。其余轮次使用缓存的空气质量并显示原时间。每轮至多一条合并变化事件。
+- 预报每小时一轮：合并未来第1、第2小时和默认7天的逐日预报。明天天气取逐日项，可在配置中选择1至10天。
+- 日出日落按代表坐标本地计算并定时投递，不补报停机期间错过的事件。极昼极夜没有对应事件。
+- `realtime_weather_current`返回合并实况；`realtime_weather_forecast`返回合并预报。工具等待查询完成，实况缓存15分钟、预报缓存1小时，请求超时10秒。
+
+温度/体感变化默认3°C，风力变化2级，能见度跨越1 km，UV与空气质量跨等级时双向提醒。降水类型、雨雪强度、晴阴转换和预警生命周期变化也会触发。预报降水概率变化阈值为30个百分点。阈值在配置页修改，下次轮询使用新值。
+
+实况时间表示查询时间；预报行时间是预报有效时刻。内部使用UTC，展示采用所选地点时区。缺失字段不当作零。
+
+## 文案文件
+
+- 包内默认：`src/ambience.default.json`。
+- 部署覆盖：`<部署目录>/worlds/realtime-weather/ambience.json`。
+- 配置页“打开文案JSON”创建并打开部署覆盖文件。保存后自动重载；“恢复默认”覆盖部署文件并立即重载。
+- 文件不存在、JSON语法或结构错误时，整份使用包内默认文案，损坏文件保持原样。面板显示原因。
+
+默认词句取自操作者提供的demo及补充词库。方括号内为可采用的氛围叙述，动作、感官和心理描写不表示已发生或已实测；数据段独立列出查询事实。未覆盖的场景只输出数据。
+
+JSON契约见`src/ambience.schema.json`。`rules`中的`part`为`opening`（起手）、`body`（后半句）或`complete`（独立句）；`when`中的标签必须全部匹配。最高`priority`的候选随机选一条，`texts: []`保留接口而不输出文案。`complete`优先；没有匹配后半句时不输出起手。
+
+可用于补充词库的标签：
+
+- 查询：`current`、`forecast`、`active`、`passive`。
+- 当地时间：`morning` 05:00–08:00、`day` 08:00–17:00、`evening` 17:00–19:30、`night` 19:30–23:30、`lateNight` 23:30–05:00；`daylight`/`dark`按太阳位置判断。
+- 静态天气：`clear`、`cloudy`、`lightRain`、`heavyRain`、`lightSnow`、`heavySnow`、`mixed`、`thunder`、`fog`、`polluted`、`windy`、`freezing`、`hot`、`humidHot`。
+- 变化：`becameClear`、`becameCloudy`、`conditionChanged`、`rainStarted`、`rainStopped`、`rainStronger`、`rainWeaker`、`snowStarted`、`snowStopped`、`snowStronger`、`snowWeaker`、`precipitationChanged`、`temperatureUp/Down`、`feelsLikeUp/Down`、`windUp/Down`、`visibilityUp/Down`、`uvUp/Down`、`airUp/Down`、`probabilityUp/Down`。`Up/Down`各为独立标签。
+- UV补充条件：`highUv` ≥7、`lowUv` ≤2。空气改善补充条件`clearerAir`表示当前AQI为优/良或Excellent/Good，且能见度高于上次空气采样时。
+- 预警：`alertAdded`、`alertUpdated`、`alertDowngraded`、`alertCancelled`、`alertRemoved`、`alertExpired`。
+- 预报：`forecastRain`、`forecastCold`、`forecastWarm`、`forecastWet`、`forecastClear`。降雨预报要求概率>70%；冷暖比较未来两小时与当前气温，连续天气使用整个预报序列。
+- 天文：`sunrise`、`sunset`、`cloudyOrWet`、`calm`。
+
+## 信息边界
+
+地区名称和代表坐标仅供服务端及设置页使用，工具、事件与提示词不输出坐标、地点名称或Location ID。原始预警可能含地名，只在WebUI显示；模型收到归一化的类型、等级和时间。部分未映射的官方类型显示“气象预警”，原文仍可查看。空气质量明确AQI标准，不能跨标准比较数值或等级。
+
+QWeather收到查询坐标。其他能读取部署config的工具仍可读取地区配置。天气预警基于行政区代表点，不能表示整片行政区均适用。预警到期、取消或消失不等于灾害结束。
+
+## 开发
+
+`pnpm install`，然后执行`pnpm test`、`pnpm run typecheck`、`pnpm run typecheck:web`及`pnpm run build:web`。测试只连接本机HTTP服务，不访问真实QWeather。
+
+在Cortico检出中执行`pnpm describe:extension <包目录>`和`pnpm check:extension <包目录>`生成自描述并检查契约。实际权限和请求耗时需配置凭据后由面板手动测试；开发验证不启动真实bot。
