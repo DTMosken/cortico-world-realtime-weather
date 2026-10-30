@@ -48,6 +48,8 @@ JSON契约见`src/ambience.schema.json`。`rules`中的`part`为`opening`（起�
 - 静态天气：`clear`、`cloudy`、`lightRain`、`heavyRain`、`lightSnow`、`heavySnow`、`mixed`、`thunder`、`fog`、`polluted`、`windy`、`freezing`、`hot`、`humidHot`。
 - 变化：`becameClear`、`becameCloudy`、`conditionChanged`、`rainStarted`、`rainStopped`、`rainStronger`、`rainWeaker`、`snowStarted`、`snowStopped`、`snowStronger`、`snowWeaker`、`rainToSnow`、`snowToRain`、`precipitationChanged`、`temperatureUp/Down`、`feelsLikeUp/Down`、`windUp/Down`、`visibilityUp/Down`、`uvUp/Down`、`airUp/Down`、`probabilityUp/Down`。`Up/Down`各为独立标签。被动事件只向文案提供本轮变化标签。
 - UV补充条件：`highUv` ≥7、`lowUv` ≤2。空气改善补充条件`clearerAir`表示当前AQI为优/良或Excellent/Good，且能见度高于本段污染开始时；中间改善轮次不前移该基线。
+- 通用空气改善句使用 `goodAir` 和 `clearAirWeather`（当前晴或云类天气），不限制视程是否提升；当前仍为霾、沙尘或雾时不套开窗句。
+- 特殊降水转为无降水生成 `precipitationStopped`，当前仅输出数据，不使用降水形态转换句。
 - 空气改善中的霾散句还要求 `hazeClearedSinceAirBaseline`：空气变化基线时确有霾，当前已转为晴或云类天气。AQI改善到良好/低风险及视程提升仍须同时满足。
 - 能见度雾气文案要求当前`waterFog`或上次`wasWaterFog`：对应时点的天气代码为雾、能见度低于2 km且该时点空气质量未达4级。雾散句还要求当前不再是雾代码；未满足时使用不推断成因的能见度句。空气变差文案根据`visibilityFell`或`visibilityNotFallen`选择对应句子。
 - `strongWind`表示风力升高后达到5级，供被动大风句使用。

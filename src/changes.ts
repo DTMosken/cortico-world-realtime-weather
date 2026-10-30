@@ -37,6 +37,7 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     else if (['snow', 'mixed'].includes(oldType) && newType === 'rain') add('snowToRain', '雪转雨');
     else if (newType === 'rain' || newType === 'snow') add(newType === 'rain' ? 'rainStarted' : 'snowStarted', `${newType === 'rain' ? '开始下雨' : '开始下雪'}`);
     else if (newType === 'none' && (oldType === 'rain' || oldType === 'snow')) add(oldType === 'rain' ? 'rainStopped' : 'snowStopped', oldType === 'rain' ? '雨停了' : '雪停了');
+    else if (newType === 'none') add('precipitationStopped', '当前无降水');
     else add('precipitationChanged', '降水类型改变');
   } else if (['rain', 'snow'].includes(newType)) {
     // Only compare known intensity classes; shower/type codes do not imply a strength.

@@ -81,6 +81,7 @@ export class RealtimeWeatherWorld implements World {
     const tags = changes ? ['current', ...changes.map(c => c.id), ...this.tags(weather).filter(t => ['daylight', 'dark', 'calm', 'cloudyOrWet'].includes(t))] : ['current', ...this.tags(weather)];
     if (weather?.uv !== undefined) { if (weather.uv >= 7) tags.push('highUv'); if (weather.uv <= 2) tags.push('lowUv'); }
     if (current.air && goodAir(current.air) && weather?.visibilityKm !== undefined && this.airVisibilityBaseline !== undefined && weather.visibilityKm > this.airVisibilityBaseline) tags.push('clearerAir');
+    if (weather && weatherTags(weather).some(tag => ['clear', 'cloudy'].includes(tag))) tags.push('clearAirWeather');
     if (this.airHazeBaseline && weather && weatherTags(weather).some(tag => ['clear', 'cloudy'].includes(tag))) tags.push('hazeClearedSinceAirBaseline');
     if (!changes && weather && current.air && current.air.level >= 4 && weatherTags(weather).some(t => ['haze', 'dust'].includes(t))) tags.push('polluted');
     if (weather && (weather.windScale ?? 0) >= 5 && changes?.some(c => c.id === 'windUp')) tags.push('strongWind');

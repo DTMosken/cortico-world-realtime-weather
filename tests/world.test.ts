@@ -33,16 +33,31 @@ describe('实况与预报合并', () => {
     expect(String(text).includes('鹅毛大雪')).toBe(heavy);
     if (['401', '407', '457', '499'].includes(code)) expect(String(text)).toContain('窗外正飘着雪');
   });
-  it.each([['502', '502'], ['104', '104']])('空气改善%s→%s不能套霾散句', async (before, after) => {
+  it.each([['502', 8000], ['104', 8000], ['502', 3000], ['104', 3000]])('空气改善后天气%s、视程%s按当前环境选句', async (code, visibility) => {
     fixture = await service();
     fixture.air.indexes[0] = { ...fixture.air.indexes[0], level: '3', category: '轻度污染' };
-    fixture.current = weather({ condition: { code: before }, visibility: { value: 3000 } });
+    fixture.current = weather({ condition: { code }, visibility: { value: 3000 } });
     await fixture.world.start(fixture.host);
     for (let i = 0; i < 3; i++) await fixture.world.pollCurrent();
     fixture.air.indexes[0] = { ...fixture.air.indexes[0], level: '2', category: '良' };
-    fixture.current = weather({ condition: { code: after }, visibility: { value: 8000 } });
+    fixture.current = weather({ condition: { code }, visibility: { value: visibility } });
     await fixture.world.pollCurrent();
     expect(fixture.events.at(-1)!.text).not.toMatch(/灰霾终于散干净|浑浊的天空被风/);
+    const text = fixture.events.at(-1)!.text!;
+    if (code === '104') expect(text).toContain('总算可以推开窗痛快地换口气');
+    else { expect(text).toContain('AQI'); expect(text).not.toContain('['); }
+  });
+  it.each(['none', 'mixed'])('特殊降水转%s只在仍降水时使用形态变化句', async after => {
+    fixture = await service();
+    fixture.current = weather({ condition: { code: '999' }, precipitation: { type: 'ice' } });
+    await fixture.world.start(fixture.host);
+    fixture.current = weather({ condition: { code: '999' }, precipitation: { type: after } });
+    await fixture.world.pollCurrent();
+    const text = fixture.events.at(-1)!.text!;
+    if (after === 'none') {
+      expect(text).toContain('当前无降水');
+      expect(text).not.toContain('[');
+    } else expect(text).toContain('窗外落下来的东西变了样');
   });
   it('雾散文案查上一轮AQI，污染改善不能误作水雾散去', async () => {
     fixture = await service();

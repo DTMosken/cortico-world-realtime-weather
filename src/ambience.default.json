@@ -1308,7 +1308,7 @@
         "current",
         "airUp",
         "goodAir",
-        "airWithoutClearerView"
+        "clearAirWeather"
       ],
       "texts": [
         "外面的空气肉眼可见地变得干净清爽了起来，总算可以推开窗痛快地换口气了。"
