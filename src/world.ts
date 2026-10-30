@@ -1,3 +1,4 @@
+import { coerceGroupValues } from 'cortico/core/config-schema.ts';
 import { goodAir, pollutedAir, highAirRisk, lowerAirRisk } from './air-quality.ts';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -6,7 +7,7 @@ import type { WorldContext } from 'cortico/world.ts';
 import { nowIso } from 'cortico/core/util.ts';
 import type { Language } from 'cortico/core/language.ts';
 import { REALTIME_WEATHER_SECRET, realtimeWeatherConfigGroup, type Location, type RealtimeWeatherConfigSection } from './config.ts';
-import { QWeather } from './qweather.ts';
+import { apiBase, QWeather } from './qweather.ts';
 import { Ambience } from './ambience.ts';
 import { alertChanges, weatherChanges } from './changes.ts';
 import { clock, isDaylight, solarTimes } from './time.ts';
@@ -277,7 +278,7 @@ export class RealtimeWeatherWorld implements World {
 
   webUi(language?: Language): WorldWebUiDecl {
     return {
-      label: '实时天气', config: [realtimeWeatherConfigGroup(language)],
+      label: '实时天气',
       badges: [{ label: 'QWeather', value: this.ctx.secret(REALTIME_WEATHER_SECRET) ? '密钥已配置' : '密钥未配置' }, { label: '地点', value: this.ctx.cfg.location?.name ?? '未选择' }],
       panels: [{ id: 'config', title: '配置' }],
       promptDocs: [{ key: 'worlds.realtime-weather.envPrompt', title: '实时天气', description: '天气工具、时间与氛围叙述的含义。', path: ENV_PROMPT_FILE, role: 'envPrompt' }],
@@ -286,6 +287,18 @@ export class RealtimeWeatherWorld implements World {
         if (method === 'state') {
           this.ambience.reload();
           return { config: this.ctx.cfg, keySet: !!this.ctx.secret(REALTIME_WEATHER_SECRET), ambience: { file: this.ambience.file, usingDefault: this.ambience.usingDefault, error: this.ambience.error }, errors: { ...this.current?.errors, ...this.forecast?.errors }, alerts: this.client.rawAlerts, attributions: [...this.client.attributions] };
+        }
+        if (method === 'save') {
+          const [key, raw] = args;
+          if (typeof key !== 'string' || key === 'location') throw new Error('未知配置项');
+          const path = `worlds.realtime-weather.${key}`;
+          const result = coerceGroupValues(realtimeWeatherConfigGroup(language), { [path]: raw }, language);
+          if ('error' in result) throw new Error(result.error);
+          const value = result.values[path];
+          if (key === 'apiHost' && value) apiBase(String(value));
+          this.ctx.persist({ [key]: value });
+          if (key === 'apiHost') await this.ctx.restart();
+          return { ok: true };
         }
         if (method === 'searchCities') {
           if (typeof args[0] !== 'string' || !args[0].trim()) throw new Error('请输入城市或区划名称');

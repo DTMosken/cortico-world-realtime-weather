@@ -54,12 +54,7 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
       const key = path.split('.').at(-1) as keyof RealtimeWeatherConfigSection;
       const control = ui.input({ type: property.type === 'string' ? 'text' : 'number', value: String(state.config[key]), onChange: async value => {
         try {
-          if (key === 'apiHost') {
-            const host = value.trim();
-            if (host && !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.qweatherapi\.com$/i.test(host)) throw new Error('请填控制台提供的API Host，不含https://或路径');
-          }
-          await ctx.setConfig(group.id, { [path]: property.type === 'string' ? value.trim() : Number(value) });
-          if (key === 'apiHost') await ctx.invoke('restart');
+          await ctx.invoke('save', [key, property.type === 'string' ? value.trim() : Number(value)]);
           state = await ctx.invoke<State>('state'); message = '已保存'; failed = false; render();
         } catch (error) { message = error instanceof Error ? error.message : '保存失败'; failed = true; render(); }
       } });

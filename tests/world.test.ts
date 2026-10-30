@@ -6,6 +6,24 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('单个自定义配置面板可保存配置并按声明限制输入', async () => {
+    fixture = await service();
+    const page = fixture.world.webUi();
+    expect(page.config).toBeUndefined();
+    expect(page.panels?.map(panel => panel.id)).toEqual(['config']);
+    const invoke = page.invoke!;
+    await invoke('config', 'save', ['temperatureChange', 4.5]);
+    expect(fixture.cfg.temperatureChange).toBe(4.5);
+    await expect(invoke('config', 'save', ['forecastDays', 11])).rejects.toThrow();
+    await expect(invoke('config', 'save', ['location', {}])).rejects.toThrow();
+    await expect(invoke('config', 'save', ['unlisted', true])).rejects.toThrow();
+    await expect(invoke('config', 'save', ['apiHost', 'https://other.example'])).rejects.toThrow();
+    expect(fixture.restarts).toBe(0);
+    await invoke('config', 'save', ['apiHost', 'newhost.qweatherapi.com']);
+    expect(fixture.cfg.apiHost).toBe('newhost.qweatherapi.com');
+    expect(fixture.restarts).toBe(1);
+  });
+
   it.each([["qaqi", 2, 4, 6], ["cn-mee", 2, 3, 6], ["cn-mee-1h", 2, 3, 6], ["hk-epd", 1, 3, 5], ["mo-smg", 1, 3, 6], ["tw-me", 1, 3, 6], ["tw-me-1h", 1, 3, 6], ["us-epa", 1, 3, 6], ["us-epa-nc", 1, 3, 6], ["eu-eea", 2, 4, 6], ["fr-atmo", 1, 3, 6], ["kr-moe", 1, 3, 4], ["jp-moe", 3, 4, 6], ["gb-defra", 1, 3, 4], ["ca-eccc", 1, 3, 4], ["sg-nea", 1, 3, 5], ["sg-nea-pm1h", 1, 2, 4], ["th-pcd", 2, 4, 5]])('%s按本地标准匹配改善、变差和良好文案', async (standard, good, polluted, worst) => {
     fixture = await service();
     fixture.air.indexes[0] = { ...fixture.air.indexes[0], code: standard, level: String(worst), category: 'PRIVATE_LOCATION 42.33' };
