@@ -8,18 +8,32 @@ export function precipitationRank(w: Weather): number | undefined {
 }
 
 /** 数字基线只在对应阈值触发时前移；其他字段保持最近成功状态。 */
-export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeWeatherConfigSection): { changes: Change[]; baseline: Weather } {
+export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeWeatherConfigSection, temperatureThreshold = cfg.temperatureChange): { changes: Change[]; baseline: Weather } {
   const changes: Change[] = [];
   const baseline: Weather = { ...current };
-  const add = (id: string, text: string) => changes.push({ id, text });
+  const add = (id: string, text: string, delta?: number) => changes.push({ id, text, ...(delta === undefined ? {} : { delta }) });
+  const oldTags = weatherTags(before), newTags = weatherTags(current);
   if (conditionCode(before.conditionCode) !== conditionCode(current.conditionCode)) {
-    const oldTags = weatherTags(before), newTags = weatherTags(current);
-    const id = oldTags.includes('cloudy') && newTags.includes('clear') ? 'becameClear' : oldTags.includes('clear') && newTags.includes('cloudy') ? 'becameCloudy' : 'conditionChanged';
+    const cloudRank: Record<string, number> = { '102': 1, '103': 1, '101': 2, '104': 3 };
+    const oldCloud = cloudRank[conditionCode(before.conditionCode)], newCloud = cloudRank[conditionCode(current.conditionCode)];
+    const id = oldCloud !== undefined && newCloud !== undefined && oldCloud !== newCloud ? newCloud > oldCloud ? 'cloudIncreased' : 'cloudDecreased' : oldTags.includes('cloudy') && newTags.includes('clear') ? 'becameClear' : oldTags.includes('clear') && newTags.includes('cloudy') ? 'becameCloudy' : 'conditionChanged';
     add(id, `${before.condition}→${current.condition}`);
+  }
+  const oldThunder = oldTags.includes('thunder'), newThunder = newTags.includes('thunder');
+  if (!oldThunder && newThunder) add('thunderStarted', '出现雷阵雨');
+  if (oldThunder && !newThunder && current.precipitationType === 'none') add('thunderStopped', '雷阵雨停止');
+  if (oldThunder && ['305', '306', '309', '314'].includes(current.conditionCode)) add('thunderToRain', '雷阵雨转普通雨');
+  for (const phenomenon of ['haze', 'dust'] as const) {
+    if (!oldTags.includes(phenomenon) && newTags.includes(phenomenon)) add(`${phenomenon}Started`, phenomenon === 'haze' ? '出现霾' : '出现沙尘');
+    if (oldTags.includes(phenomenon) && newTags.some(t => ['clear', 'cloudy'].includes(t))) add(`${phenomenon}Cleared`, phenomenon === 'haze' ? '霾消退' : '沙尘消退');
   }
   const oldType = before.precipitationType ?? 'unknown', newType = current.precipitationType ?? 'unknown';
   if (oldType !== newType) {
-    if (oldType === 'rain' && ['snow', 'mixed'].includes(newType)) add('rainToSnow', '雨转雪或雨夹雪');
+    if (oldType === 'none' && newType === 'mixed') add('mixedStarted', '开始下雨夹雪');
+    else if (oldType === 'mixed' && newType === 'none') add('mixedStopped', '雨夹雪停止');
+    else if (oldType === 'snow' && newType === 'mixed') add('snowToMixed', '雪转雨夹雪');
+    else if (oldType === 'mixed' && newType === 'snow') add('mixedToSnow', '雨夹雪转雪');
+    else if (oldType === 'rain' && ['snow', 'mixed'].includes(newType)) add('rainToSnow', '雨转雪或雨夹雪');
     else if (['snow', 'mixed'].includes(oldType) && newType === 'rain') add('snowToRain', '雪转雨');
     else if (newType === 'rain' || newType === 'snow') add(newType === 'rain' ? 'rainStarted' : 'snowStarted', `${newType === 'rain' ? '开始下雨' : '开始下雪'}`);
     else if (newType === 'none' && (oldType === 'rain' || oldType === 'snow')) add(oldType === 'rain' ? 'rainStopped' : 'snowStopped', oldType === 'rain' ? '雨停了' : '雪停了');
@@ -39,7 +53,7 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     }
   }
   for (const [key, threshold, unit, label, up, down] of [
-    ['temperature', cfg.temperatureChange, '°C', '温度', 'temperatureUp', 'temperatureDown'],
+    ['temperature', temperatureThreshold, '°C', '温度', 'temperatureUp', 'temperatureDown'],
     ['feelsLike', cfg.temperatureChange, '°C', '体感', 'feelsLikeUp', 'feelsLikeDown'],
     ['windScale', cfg.windScaleChange, '级', '风力', 'windUp', 'windDown'],
     ['precipitationProbability', cfg.precipitationProbabilityChange / 100, '', '降水概率', 'probabilityUp', 'probabilityDown'],
@@ -49,7 +63,7 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     const delta = key === 'precipitationProbability' ? Math.abs(Math.round(value * 100) - Math.round(previous * 100)) / 100 : Math.abs(value - previous);
     if (delta >= threshold) {
       const display = (n: number) => key === 'precipitationProbability' ? `${Math.round(n * 100)}%` : `${Math.round(n * 10) / 10}${unit}`;
-      add(value > previous ? up : down, `${label}${display(previous)}→${display(value)}`);
+      add(value > previous ? up : down, `${label}${display(previous)}→${display(value)}`, value - previous);
     } else baseline[key] = previous;
   }
   if (before.visibilityKm !== undefined && current.visibilityKm !== undefined && (before.visibilityKm < cfg.visibilityThresholdKm) !== (current.visibilityKm < cfg.visibilityThresholdKm)) add(current.visibilityKm < cfg.visibilityThresholdKm ? 'visibilityDown' : 'visibilityUp', `能见度${before.visibilityKm}→${current.visibilityKm} km`);

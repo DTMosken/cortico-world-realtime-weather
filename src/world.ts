@@ -83,15 +83,23 @@ export class RealtimeWeatherWorld implements World {
     if (!changes && weather && current.air && current.air.level >= 4 && weatherTags(weather).some(t => ['haze', 'dust'].includes(t))) tags.push('polluted');
     if (weather && (weather.windScale ?? 0) >= 5 && changes?.some(c => c.id === 'windUp')) tags.push('strongWind');
     if (weather && weatherTags(weather).includes('fog') && (!current.air || current.air.level < 4)) tags.push('waterFog');
-    if (this.previous?.weather && weatherTags(this.previous.weather).includes('fog') && (!current.air || current.air.level < 4)) tags.push('wasWaterFog');
+    if (this.previous?.weather && weatherTags(this.previous.weather).includes('fog') && (!this.previous.air || this.previous.air.level < 4) && weather && ![500, 501, 509, 510, 514, 515].includes(Number(weather.conditionCode))) tags.push('wasWaterFog');
     if (weather?.visibilityKm !== undefined && this.previous?.weather?.visibilityKm !== undefined && weather.visibilityKm < this.previous.weather.visibilityKm) tags.push('visibilityFell');
+    if (weather?.windScale !== undefined && weather.windScale >= 3 && weather.windScale < 5) tags.push('moderateWind');
+    if (current.air && !current.errors.air) {
+      if (['优', '良', 'Excellent', 'Good'].includes(current.air.category)) tags.push('goodAir');
+      if (['轻度污染', '中度污染', '重度污染', '严重污染', 'Unhealthy for Sensitive Groups', 'Unhealthy', 'Very Unhealthy', 'Hazardous'].includes(current.air.category)) tags.push('pollutedAir');
+      if (!tags.includes('clearerAir')) tags.push('airWithoutClearerView');
+      if (current.air.level < 4) tags.push('notSeverelyPolluted');
+    } else if (!current.air) tags.push('notSeverelyPolluted');
+    if (weather?.visibilityKm !== undefined && this.previous?.weather?.visibilityKm !== undefined && weather.visibilityKm >= this.previous.weather.visibilityKm) tags.push('visibilityNotFallen');
     const alertTypes = Object.fromEntries((changes ?? []).filter(c => c.alertType).map(c => [c.id, [...new Set(changes!.filter(other => other.id === c.id).map(other => other.alertType))].join('、')]));
     const atmosphere = this.ambience.render('current', trigger, current.at, this.timezone(), tags, alertTypes);
     const data = changes ? `${clock(current.at, this.timezone())}｜${changes.map(c => c.text).join('｜')}` : currentLine(current, this.timezone());
     return [data, atmosphere].filter(Boolean).join('\n\n');
   }
   private forecastReceipt(forecast: Forecast, trigger: 'active' | 'passive', changes?: Change[], selection?: ForecastSelection): string {
-    const tags = forecastTags(forecast, this.current?.errors.weather ? undefined : this.current?.weather, this.ctx.cfg.temperatureChange, this.timezone(), selection);
+    const tags = forecastTags(forecast, this.current?.errors.weather ? undefined : this.current?.weather, this.ctx.cfg, this.timezone(), selection);
     const atmosphere = this.ambience.render('forecast', trigger, forecast.at, this.timezone(), tags);
     const data = changes ? `${clock(forecast.at, this.timezone())}\n${changes.map(c => c.text).join('\n')}` : forecastLines(forecast, this.timezone());
     return [data, atmosphere].filter(Boolean).join('\n\n');
@@ -170,7 +178,7 @@ export class RealtimeWeatherWorld implements World {
       const old = this.previousForecast?.hours.find(h => h.at === hour.at);
       if (current.errors.hours) { next.hours.push(old ?? hour); continue; }
       if (old) {
-        const result = weatherChanges(old, hour, this.ctx.cfg);
+        const result = weatherChanges(old, hour, this.ctx.cfg, Math.min(2, this.ctx.cfg.temperatureChange));
         if (result.changes.length && visibleHours.has(hour.at)) {
           changes.push({ id: 'hourChanged', text: `${clock(hour.at, this.timezone())}｜${result.changes.map(c => c.text).join('｜')}` });
           selection.hours.set(hour.at, result.changes);

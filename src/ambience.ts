@@ -38,24 +38,29 @@ export class Ambience {
   restore(): void { writeFileSync(this.file, JSON.stringify(DEFAULTS, null, 2) + '\n'); this.reload(); }
   ensureFile(): void { if (!existsSync(this.file)) this.restore(); }
 
-  private select(part: AmbienceRule['part'], tags: Set<string>): { text: string; when: string[] } | undefined {
-    const matches = this.document.rules.filter(r => r.part === part && r.texts.length && r.when.every(t => tags.has(t)));
+  private select(part: AmbienceRule['part'], tags: Set<string>, alerts = false): { text: string; when: string[] } | undefined {
+    const matches = this.document.rules.filter(r => r.part === part && (part !== 'body' || r.when.some(t => t.startsWith('alert')) === alerts) && r.texts.length && r.when.every(t => tags.has(t)));
     const priority = Math.max(...matches.map(r => r.priority));
     const candidates = matches.filter(r => r.priority === priority).flatMap(r => r.texts.map(text => ({ text, when: r.when })));
     return candidates.length ? candidates[Math.floor(this.random() * candidates.length)] : undefined;
   }
   render(kind: 'current' | 'forecast' | 'sunrise' | 'sunset', trigger: 'active' | 'passive', at: string, timezone: string, tags: string[], alertTypes: Record<string, string> = {}): string {
     const all = new Set([kind, trigger, period(at, timezone), ...tags]);
-    const complete = this.select('complete', all);
-    if (complete) return `[${complete.text}]`;
-    const body = this.select('body', all);
-    if (!body) return '';
-    const openingKind = body.when.some(t => t.startsWith('alert')) ? 'forecast' : kind;
-    const openingTags = new Set([...all].filter(t => t !== kind));
-    openingTags.add(openingKind);
-    const opening = this.select('opening', openingTags);
-    const alertType = body.when.map(tag => alertTypes[tag]).find(Boolean) ?? '气象';
-    const text = body.text.replace(/\{alertType\}|\[(台风\/暴雨\/雷电\/大风|暴雨\/大风\/高温|暴雨\/大风\/暴雪)\]/g, alertType);
-    return `[${opening?.text ?? ''}${text}]`;
+    const weatherTags = new Set([...all].filter(t => !t.startsWith('alert')));
+    const alertTags = all;
+    const complete = this.select('complete', weatherTags);
+    const body = this.select('body', weatherTags);
+    const weatherText = complete?.text ?? (body ? `${this.select('opening', weatherTags)?.text ?? ''}${body.text}` : '');
+    // Alert prose has its own selection and is always appended after weather prose.
+    const alertBody = this.select('body', alertTags, true);
+    let alertText = '';
+    if (alertBody) {
+      const alertType = alertBody.when.map(tag => alertTypes[tag]).find(Boolean) ?? '气象';
+      const openingTags = new Set([...alertTags].filter(t => t !== kind));
+      openingTags.add('forecast');
+      alertText = `${this.select('opening', openingTags)?.text ?? ''}${alertBody.text.replace(/\{alertType\}|\[(台风\/暴雨\/雷电\/大风|暴雨\/大风\/高温|暴雨\/大风\/暴雪)\]/g, alertType)}`;
+    }
+    const text = weatherText + alertText;
+    return text ? `[${text}]` : '';
   }
 }

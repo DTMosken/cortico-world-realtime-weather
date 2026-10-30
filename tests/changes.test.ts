@@ -5,6 +5,20 @@ import type { Alert, Weather } from '../src/model.ts';
 const base: Weather = { conditionCode: '100', condition: '晴', temperature: 22, feelsLike: 22, precipitationType: 'none', visibilityKm: 8, uv: 2, windScale: 2 };
 describe('双向变化', () => {
   it.each([
+    ['none', 'mixed', 'mixedStarted'], ['mixed', 'none', 'mixedStopped'],
+    ['snow', 'mixed', 'snowToMixed'], ['mixed', 'snow', 'mixedToSnow'],
+  ])('雨夹雪转换%s→%s不混用开始下雪', (before, after, tag) => {
+    expect(weatherChanges({ ...base, precipitationType: before }, { ...base, precipitationType: after }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toEqual([tag]);
+  });
+  it.each([
+    ['102', '101', 'cloudIncreased'], ['104', '101', 'cloudDecreased'],
+    ['305', '302', 'thunderStarted'], ['303', '100', 'thunderStopped'], ['303', '305', 'thunderToRain'],
+    ['104', '502', 'hazeStarted'], ['502', '104', 'hazeCleared'], ['104', '503', 'dustStarted'], ['504', '104', 'dustCleared'],
+  ])('天气转换%s→%s生成专用语义', (before, after, tag) => {
+    const next = { ...base, conditionCode: after, precipitationType: Number(after) >= 300 && Number(after) < 400 ? 'rain' : 'none' };
+    expect(weatherChanges({ ...base, conditionCode: before }, next, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toContain(tag);
+  });
+  it.each([
     [{ visibilityKm: 0.5 }, 'visibilityDown'], [{ visibilityKm: 0.5, uv: 8 }, 'uvUp'], [{ windScale: 5 }, 'windUp'],
   ] as const)('达到阈值产生事件：%j', (next, id) => { expect(weatherChanges(base, { ...base, ...next }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toContain(id); });
   it('能见度恢复和UV降低同样产生事件', () => {

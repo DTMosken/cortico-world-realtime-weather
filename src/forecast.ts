@@ -1,6 +1,8 @@
 import type { Change, Forecast, Weather } from './model.ts';
 import { weatherTags } from './model.ts';
 import { dateKey } from './time.ts';
+import { precipitationRank, weatherChanges } from './changes.ts';
+import type { RealtimeWeatherConfigSection } from './config.ts';
 
 export interface ForecastSelection {
   hours: Map<string, Change[]>;
@@ -8,14 +10,15 @@ export interface ForecastSelection {
 }
 
 /** Passive prose uses changed slots and the changed weather dimensions only. */
-export function forecastTags(forecast: Forecast, current: Weather | undefined, threshold: number, timezone: string, selection?: ForecastSelection): string[] {
+export function forecastTags(forecast: Forecast, current: Weather | undefined, cfg: RealtimeWeatherConfigSection, timezone: string, selection?: ForecastSelection): string[] {
+  const threshold = cfg.temperatureChange;
   const tags = new Set<string>();
   const hours = forecast.errors.hours ? [] : forecast.hours.filter(h => Date.parse(h.at) > Date.parse(forecast.at));
   const visible = hours.slice(0, 2);
   const days = forecast.errors.days ? [] : forecast.days;
   const today = dateKey(Date.parse(forecast.at), timezone);
   const wet = (w: Weather) => ['rain', 'snow', 'mixed'].includes(w.precipitationType ?? '');
-  for (const hour of visible) {
+  for (const [index, hour] of visible.entries()) {
     const changes = selection?.hours.get(hour.at);
     if (selection && !changes) continue;
     const ids = changes?.map(c => c.id);
@@ -28,6 +31,33 @@ export function forecastTags(forecast: Forecast, current: Weather | undefined, t
       if (hour.temperature <= current.temperature - threshold && (!ids || ids.includes('temperatureDown'))) tags.add('forecastCold');
       if (hour.temperature >= current.temperature + threshold && (!ids || ids.includes('temperatureUp'))) tags.add('forecastWarm');
     }
+    for (const change of changes ?? []) {
+      if (change.delta !== undefined && change.id === 'temperatureUp' && change.delta <= 2 && !tags.has('forecastWarm')) tags.add('forecastTemperatureRevisedUp');
+      if (change.delta !== undefined && change.id === 'temperatureDown' && change.delta >= -3 && !tags.has('forecastCold')) tags.add('forecastTemperatureRevisedDown');
+    }
+    const previous = index === 0 ? current : visible[index - 1];
+    if (!previous) continue;
+    const trend = weatherChanges(previous, hour, cfg).changes.map(c => c.id);
+    const changed = (prefix: string) => !ids || ids.some(id => id.startsWith(prefix));
+    for (const dimension of ['wind', 'visibility', 'uv'] as const) {
+      if (!changed(dimension)) continue;
+      for (const direction of ['Up', 'Down']) if (trend.includes(`${dimension}${direction}`)) {
+        if (dimension === 'uv' && direction === 'Up' && (hour.uv ?? 0) < 7) continue;
+        tags.add(`forecast${dimension[0].toUpperCase()}${dimension.slice(1)}${direction}`);
+      }
+    }
+    if (!ids || ids.some(id => /^(rain|snow|mixed|precipitation|condition|thunder)/.test(id))) {
+      if (current?.precipitationType === 'rain') {
+        if (trend.includes('rainStopped')) tags.add('forecastRainStopped');
+        if (trend.includes('rainWeaker') && ((precipitationRank(current) ?? 0) >= 2 || (current.precipitationIntensity ?? 0) >= 2.5)) tags.add('forecastRainWeaker');
+      }
+      if (trend.includes('snowStarted') || trend.includes('rainToSnow') && hour.precipitationType === 'snow') tags.add('forecastSnowStarted');
+      if (current?.precipitationType === 'snow') {
+        if (trend.includes('snowStopped')) tags.add('forecastSnowStopped');
+        if (trend.includes('snowStronger')) tags.add('forecastSnowStronger');
+        if (trend.includes('snowWeaker') && (precipitationRank(current) ?? 0) >= 3) tags.add('forecastSnowWeaker');
+      }
+    }
   }
   // Daily extrema compare with the preceding date, not a daytime observation.
   for (let index = 1; index < days.length; index++) {
@@ -37,9 +67,20 @@ export function forecastTags(forecast: Forecast, current: Weather | undefined, t
     if (selection && !changes) continue;
     const deltas = (['min', 'max'] as const).flatMap(key => day[key] !== undefined && before[key] !== undefined ? [day[key]! - before[key]!] : []);
     if (deltas.some(delta => delta <= -threshold) && (!changes || changes.some(c => c.id === 'temperatureDown'))) tags.add('forecastCold');
-    if (deltas.some(delta => delta >= threshold) && (!changes || changes.some(c => c.id === 'temperatureUp'))) tags.add('forecastDailyWarm');
   }
   const futureDays = days.filter(day => day.date > today);
+  // "一路上涨" requires a multi-day rising run, not one isolated warmer day.
+  for (let start = 0; start <= futureDays.length - 3; start++) {
+    const run = futureDays.slice(start, start + 3);
+    const rising = (['min', 'max'] as const).every(key => run.every(day => day[key] !== undefined) && run[1][key]! > run[0][key]! && run[2][key]! > run[1][key]!) && (['min', 'max'] as const).some(key => run[2][key]! - run[0][key]! >= threshold);
+    const relevant = !selection || run.some(day => selection.days.get(day.date)?.some(c => c.id === 'temperatureUp'));
+    if (rising && relevant) {
+      tags.add('forecastDailyWarm');
+      const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+      const todayForecast = days.find(day => day.date === today);
+      if (run[0].date === tomorrow && todayForecast && (['min', 'max'] as const).every(key => todayForecast[key] !== undefined && run[0][key]! > todayForecast[key]!)) tags.add('forecastDailyWarmFromTomorrow');
+    }
+  }
   for (const [tag, matches] of [
     ['forecastWet', (day: typeof days[number]) => day.daytime.precipitationType === 'rain' || day.nighttime.precipitationType === 'rain'],
     ['forecastClear', (day: typeof days[number]) => weatherTags(day.daytime).includes('clear') && !wet(day.nighttime)],

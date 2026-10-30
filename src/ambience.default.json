@@ -606,10 +606,10 @@
       "texts": [
         "外面的阳光变得格外毒辣，明晃晃地刺得人眼睛发酸，顺手把窗帘拉上了一半。"
       ],
-      "priority": 55
+      "priority": 56
     },
     {
-      "id": "body-current-uvUp-highUv-daylight-1",
+      "id": "body-current-uvUp-daylight-1",
       "part": "body",
       "when": [
         "current",
@@ -633,10 +633,10 @@
       "texts": [
         "外面的日头终于没有刚才那么毒了，刺眼的强光褪去，光线变得柔和舒适了许多。"
       ],
-      "priority": 55
+      "priority": 56
     },
     {
-      "id": "body-current-uvDown-lowUv-daylight-1",
+      "id": "body-current-uvDown-daylight-1",
       "part": "body",
       "when": [
         "current",
@@ -1023,7 +1023,7 @@
       "texts": [
         "窗外不知什么时候起了一层雾气，远处的楼房和街景渐渐隐没在白茫茫的水汽里。"
       ],
-      "priority": 50
+      "priority": 55
     },
     {
       "id": "body-visibilityUp",
@@ -1036,7 +1036,7 @@
       "texts": [
         "笼罩在窗外的浓雾终于散开了，原本模糊的街道和远处的建筑重新变得清晰通透起来。"
       ],
-      "priority": 50
+      "priority": 55
     },
     {
       "id": "body-probabilityUp",
@@ -1177,13 +1177,482 @@
       "priority": 50
     },
     {
-      "id": "pending-forecastDailyWarm",
+      "id": "supplement-clear",
       "part": "body",
       "when": [
+        "current",
+        "clear",
+        "dark"
+      ],
+      "texts": [
+        "夜空很干净，没有什么云层遮挡，能清楚地看见几颗疏朗的星星。",
+        "外面是个晴朗的夜晚，深邃的夜空显得格外通透安静。"
+      ],
+      "priority": 10
+    },
+    {
+      "id": "supplement-mixedStarted",
+      "part": "body",
+      "when": [
+        "current",
+        "mixedStarted"
+      ],
+      "texts": [
+        "窗外突然飘起了雨夹雪，冰冷的雨滴混着半融化的雪粒敲在玻璃上，发出细碎的声响。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-mixedStopped",
+      "part": "body",
+      "when": [
+        "current",
+        "mixedStopped"
+      ],
+      "texts": [
+        "外面杂乱的雨夹雪总算停了，窗沿上只留下一层湿冷的水渍和零星没化尽的冰碴。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-snowToMixed",
+      "part": "body",
+      "when": [
+        "current",
+        "snowToMixed"
+      ],
+      "texts": [
+        "原本轻盈的雪花里开始夹杂着冰冷的雨滴，落下来的动静变得急促而湿重起来。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-mixedToSnow",
+      "part": "body",
+      "when": [
+        "current",
+        "mixedToSnow"
+      ],
+      "texts": [
+        "夹杂在里面的雨水渐渐消失了，变成了纯粹的雪花，无声地在窗外飘落。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-windUp",
+      "part": "body",
+      "when": [
+        "current",
+        "windUp",
+        "moderateWind"
+      ],
+      "texts": [
+        "外面起风了，树叶和枝条开始有节奏地摇晃起来。",
+        "原本安静的空气流动了起来，风吹动着窗帘轻轻起伏。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-airUp",
+      "part": "body",
+      "when": [
+        "current",
+        "airUp",
+        "pollutedAir"
+      ],
+      "texts": [
+        "外面的空气看着比刚才干净了一点，但还是带着一层沉闷的浊气，窗户还是先关着比较好。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-airUp-good",
+      "part": "body",
+      "when": [
+        "current",
+        "airUp",
+        "goodAir",
+        "airWithoutClearerView"
+      ],
+      "texts": [
+        "外面的空气肉眼可见地变得干净清爽了起来，总算可以推开窗痛快地换口气了。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-airDown",
+      "part": "body",
+      "when": [
+        "current",
+        "airDown",
+        "pollutedAir",
+        "visibilityNotFallen"
+      ],
+      "texts": [
+        "外面的空气看着突然变脏了不少，透着一股浑浊干燥的尘土感，赶紧起身把窗户关严实了。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-visibilityDown",
+      "part": "body",
+      "when": [
+        "current",
+        "visibilityDown"
+      ],
+      "texts": [
+        "窗外的能见度比刚才降了不少，稍远一点的建筑和街景都变得有些模糊不清了。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-visibilityUp",
+      "part": "body",
+      "when": [
+        "current",
+        "visibilityUp"
+      ],
+      "texts": [
+        "外面的视线比刚才好多了，之前看着有些模糊的远处景物，现在轮廓重新变得清晰起来。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-cloudIncreased",
+      "part": "body",
+      "when": [
+        "current",
+        "cloudIncreased"
+      ],
+      "texts": [
+        "天上的云层比刚才聚拢得更厚了一些，天色也跟着暗淡了几分。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-cloudDecreased",
+      "part": "body",
+      "when": [
+        "current",
+        "cloudDecreased"
+      ],
+      "texts": [
+        "厚重的云层裂开了一些缝隙，虽然还没彻底放晴，但天色比刚才亮堂了不少。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-thunderStarted",
+      "part": "body",
+      "when": [
+        "current",
+        "thunderStarted"
+      ],
+      "texts": [
+        "窗外突然闪过一道亮光，紧接着闷雷滚过天际，急促的雨点劈里啪啦地砸了下来，赶紧把窗户关严实了。"
+      ],
+      "priority": 60
+    },
+    {
+      "id": "supplement-thunderStopped",
+      "part": "body",
+      "when": [
+        "current",
+        "thunderStopped"
+      ],
+      "texts": [
+        "震耳的雷声和急促的暴雨终于一块儿消停了，窗外只剩下湿漉漉的街道还在往下淌水。"
+      ],
+      "priority": 60
+    },
+    {
+      "id": "supplement-thunderToRain",
+      "part": "body",
+      "when": [
+        "current",
+        "thunderToRain"
+      ],
+      "texts": [
+        "轰隆隆的雷声渐渐远去了，外面剧烈的雨势也缓和成了普通的淅沥雨声。"
+      ],
+      "priority": 60
+    },
+    {
+      "id": "supplement-hazeStarted",
+      "part": "body",
+      "when": [
+        "current",
+        "hazeStarted"
+      ],
+      "texts": [
+        "窗外的空气不知不觉笼罩上了一层灰蒙蒙的浊气，看了一眼，默默起身把窗户锁紧了。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-hazeCleared",
+      "part": "body",
+      "when": [
+        "current",
+        "hazeCleared"
+      ],
+      "texts": [
+        "空气里那层灰蒙蒙的霾气终于散去了，窗外重新恢复了干净清爽的质感。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-dustStarted",
+      "part": "body",
+      "when": [
+        "current",
+        "dustStarted"
+      ],
+      "texts": [
+        "外面的天空突然泛起了土黄色，空气里肉眼可见地弥漫起干燥的沙土，赶紧把窗户关上。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-dustCleared",
+      "part": "body",
+      "when": [
+        "current",
+        "dustCleared"
+      ],
+      "texts": [
+        "漫天的黄沙和浮尘总算落定了，外面不再是那副灰头土脸的样子，但窗台上似乎已经积了一层薄灰。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "supplement-thinFog",
+      "part": "body",
+      "when": [
+        "current",
+        "thinFog"
+      ],
+      "texts": [
+        "窗外飘着一层淡淡的薄雾，远处的景物像是隔了一层轻纱，看着有些柔和朦胧。"
+      ],
+      "priority": 25
+    },
+    {
+      "id": "supplement-lightHaze",
+      "part": "body",
+      "when": [
+        "current",
+        "lightHaze",
+        "notSeverelyPolluted"
+      ],
+      "texts": [
+        "外面的天空不算通透，带着一点灰蒙蒙的雾气感，还是先别开大窗通风了。"
+      ],
+      "priority": 25
+    },
+    {
+      "id": "supplement-lightDust",
+      "part": "body",
+      "when": [
+        "current",
+        "lightDust"
+      ],
+      "texts": [
+        "空气里悬浮着些许干燥的浮尘，窗外的光线看着有些发黄，决定今天还是紧闭门窗比较好。"
+      ],
+      "priority": 25
+    },
+    {
+      "id": "supplement-forecastDailyWarmFromTomorrow",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastDailyWarmFromTomorrow"
+      ],
+      "texts": [
+        "从明天开始的温度预报一路上涨，看来接下来几天会升温，得提前做好准备了。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastDailyWarm",
+      "part": "body",
+      "when": [
+        "forecast",
         "forecastDailyWarm"
       ],
-      "texts": [],
-      "priority": 50
+      "texts": [
+        "后面几天的温度预报一路往上走，眼看着一天比一天热，得做好迎接升温的准备了。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastWindUp",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastWindUp"
+      ],
+      "texts": [
+        "上面显示待会儿风力要明显变大，寻思着要不要提前把阳台上的东西收一收。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastWindDown",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastWindDown"
+      ],
+      "texts": [
+        "看预报说外面的风待会儿就会小下去，看来不用一直听着外面的风声了。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastVisibilityDown",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastVisibilityDown"
+      ],
+      "texts": [
+        "预报提示接下来的能见度会变差，要是待会儿出门的话，路上可得多留神了。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastVisibilityUp",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastVisibilityUp"
+      ],
+      "texts": [
+        "上面说外面的视线再过一会儿就能恢复清晰了，看来不用担心影响接下来的出行。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastUvUp",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastUvUp"
+      ],
+      "texts": [
+        "看了一眼接下来的紫外线指数，待会儿太阳会变得很毒，要是出门可得把防晒和墨镜备好。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastUvDown",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastUvDown"
+      ],
+      "texts": [
+        "预报显示再过一会儿紫外线就降下去了，如果打算出门散步，倒是可以等那时候再去。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastRainWeaker",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastRainWeaker"
+      ],
+      "texts": [
+        "软件上说这阵急雨过一会儿就会变小，要是急着出门的话，稍微再等一等会好走很多。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastRainStopped",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastRainStopped"
+      ],
+      "texts": [
+        "上面提示这场雨再过不久就要停了，看来待会儿出门说不定都不用打伞了。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastSnowStarted",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastSnowStarted"
+      ],
+      "texts": [
+        "预报上居然挂出了雪花图标，说待会儿要开始下雪了，忍不住有点期待地往窗外多看了一眼。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastSnowStronger",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastSnowStronger"
+      ],
+      "texts": [
+        "上面显示接下来的雪势还会越下越大，看来外面的积雪很快就要厚起来了。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastSnowWeaker",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastSnowWeaker"
+      ],
+      "texts": [
+        "看趋势这阵大雪过一会儿就会变小了，不用太担心外面的路况继续恶化。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastSnowStopped",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastSnowStopped"
+      ],
+      "texts": [
+        "预报说雪再过一会儿就停了，盘算着等雪停了要不要出门踩踩雪。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastTemperatureRevisedUp",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastTemperatureRevisedUp"
+      ],
+      "texts": [
+        "气象软件把接下来的预测温度往上调高了一两度，虽然变化不算大，但看着比刚才预想的要暖和一点。"
+      ],
+      "priority": 30
+    },
+    {
+      "id": "supplement-forecastTemperatureRevisedDown",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastTemperatureRevisedDown"
+      ],
+      "texts": [
+        "上面把待会儿（或明天）的预测温度往下修低了一点，虽说算不上大降温，但心里还是默默记下得多备件薄衫。"
+      ],
+      "priority": 30
     }
   ]
 }

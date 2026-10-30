@@ -62,7 +62,7 @@ export interface Forecast {
   daysAt?: string;
   errors: Partial<Record<'hours' | 'days', string>>;
 }
-export interface Change { id: string; text: string; alertType?: string }
+export interface Change { id: string; text: string; alertType?: string; delta?: number }
 
 export function uvLevel(value: number): number {
   return value < 3 ? 0 : value < 6 ? 1 : value < 8 ? 2 : value < 11 ? 3 : 4;
@@ -89,6 +89,9 @@ export function weatherTags(w: Weather): string[] {
   if ([302, 303, 304].includes(code)) tags.push('thunder');
   if ([500, 501, 509, 510, 514, 515].includes(code) && w.visibilityKm !== undefined && w.visibilityKm < 2) tags.push('fog');
   if ([502, 511, 512, 513].includes(code)) tags.push('haze');
+  if (code === 500 && w.visibilityKm !== undefined && w.visibilityKm >= 2) tags.push('thinFog');
+  if (code === 502) tags.push('lightHaze');
+  if ([503, 504].includes(code)) tags.push('lightDust');
   if ([503, 504, 507, 508].includes(code)) tags.push('dust');
   if ((w.windScale ?? 0) >= 5) tags.push('windy');
   if ((w.feelsLike ?? Infinity) < 0) tags.push('freezing');

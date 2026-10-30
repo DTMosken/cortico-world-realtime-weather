@@ -6,6 +6,35 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('雾散文案查上一轮AQI，污染改善不能误作水雾散去', async () => {
+    fixture = await service();
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], aqiDisplay: '180', level: '4', category: '中度污染' };
+    fixture.current = weather({ condition: { code: '501' }, visibility: { value: 500 } });
+    await fixture.world.start(fixture.host);
+    for (let i = 0; i < 3; i++) await fixture.world.pollCurrent();
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], aqiDisplay: '85', level: '2', category: '良' };
+    fixture.current = weather(); await fixture.world.pollCurrent();
+    expect(fixture.events.at(-1)?.text).not.toContain('浓雾终于散开');
+  });
+  it('浓雾恢复至轻雾只说能见度改善，不提前说雾散', async () => {
+    fixture = await service();
+    fixture.current = weather({ condition: { code: '501' }, visibility: { value: 500 } });
+    await fixture.world.start(fixture.host);
+    fixture.current = weather({ condition: { code: '501' }, visibility: { value: 1500 } });
+    await fixture.world.pollCurrent();
+    expect(fixture.events[0].text).toContain('外面的视线比刚才好多了');
+    expect(fixture.events[0].text).not.toContain('浓雾终于散开');
+  });
+  it('同一逐时时刻修订2°C输出微调句，实况仍遵守原温差阈值', async () => {
+    fixture = await service(); fixture.current = weather({ temperature: { value: 24 } });
+    await fixture.world.start(fixture.host);
+    fixture.hours[0].temperature.value = 24;
+    await fixture.world.pollForecast();
+    expect(fixture.events[0].text).toContain('22°C→24°C');
+    expect(fixture.events[0].text).toContain('调高了一两度');
+    fixture.events.length = 0; fixture.current = weather({ temperature: { value: 26 } });
+    await fixture.world.pollCurrent(); expect(fixture.events).toEqual([]);
+  });
   it('初始化建立基线；每四轮空气质量更新一次，天气和预警每轮查询', async () => {
     fixture = await service();
     await fixture.world.start(fixture.host);
@@ -69,10 +98,10 @@ describe('实况与预报合并', () => {
     expect(text).toContain('11/01'); expect(text).toContain('15–23°C');
     expect(text).toContain('18:15'); expect(text).toContain('19:15'); expect(text).not.toContain('20:15');
   });
-  it('未覆盖的单项变化只发数据；预留规则可由操作者补充', async () => {
+  it('非雾能见度变化使用不推断原因的通用句', async () => {
     fixture = await service(); await fixture.world.start(fixture.host);
     fixture.current = weather({ visibility: { value: 500 } }); await fixture.world.pollCurrent();
-    expect(fixture.events).toHaveLength(1); expect(fixture.events[0].text).toContain('能见度'); expect(fixture.events[0].text).not.toContain('[');
+    expect(fixture.events).toHaveLength(1); expect(fixture.events[0].text).toContain('能见度'); expect(fixture.events[0].text).toContain('稍远一点的建筑和街景');
   });
   it('起雾及雾散用新增文案，温度事件不带未变化的污染文案', async () => {
     fixture = await service(); await fixture.world.start(fixture.host);
@@ -118,7 +147,7 @@ describe('实况与预报合并', () => {
   });
   it('预报失败轮次保留逐时及逐日的累计温差基线', async () => {
     fixture = await service(); await fixture.world.start(fixture.host);
-    fixture.hours[0] = { ...fixture.hours[0], temperature: { value: 24, unit: '°C' } };
+    fixture.hours[0] = { ...fixture.hours[0], temperature: { value: 23, unit: '°C' } };
     fixture.days[1].temperatureMax = { value: 25 };
     await fixture.world.pollForecast(); expect(fixture.events).toEqual([]);
     fixture.errors.hours = 503; fixture.errors.days = 503;

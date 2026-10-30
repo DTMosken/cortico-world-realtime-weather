@@ -22,6 +22,8 @@ Cortico World扩展，使用QWeather获取天气、空气质量、官方预警�
 
 温度/体感变化默认3°C，风力变化2级，能见度跨越1 km，UV与空气质量跨等级时双向提醒。降水类型、雨雪强度、晴阴转换和预警生命周期变化也会触发。预报降水概率变化阈值为30个百分点。阈值在配置页修改，下次轮询使用新值。
 
+逐小时温度预报的同一有效时刻修订达到2°C也提醒；配置温差小于2°C时采用配置值。体感、实况和逐日温差仍采用原配置。一两度上调句只匹配不超过2°C的修订，轻微下调句匹配不超过3°C的修订。
+
 实况时间表示查询时间；预报行时间是预报有效时刻。失败时保留最近成功数据并标明沿用时间，主动工具可立即重试。内部使用UTC，展示采用所选地点时区。缺失字段不当作零。
 
 ## 文案文件
@@ -35,6 +37,8 @@ Cortico World扩展，使用QWeather获取天气、空气质量、官方预警�
 
 JSON契约见`src/ambience.schema.json`。`rules`中的`part`为`opening`（起手）、`body`（后半句）或`complete`（独立句）；`when`中的标签必须全部匹配。最高`priority`的候选随机选一条，`texts: []`保留接口而不输出文案。`complete`优先；没有匹配后半句时不输出起手。
 
+预警变化的后半句由`when`中的`alert*`标签识别，独立选取一条，使用预报起手拼在普通天气氛围句末尾。普通天气和预警各自选句，互不竞争；整段仍放在同一对方括号内。数据段保留全部变化。
+
 预警类型用`{alertType}`占位，填入该条文案对应的预警变化类型；同类变化涉及多个类型时用顿号连接。类型来自归一化名称，未映射类型为“气象”，不读取预警原文。旧版枚举占位符仍可使用。
 
 可用于补充词库的标签：
@@ -44,14 +48,24 @@ JSON契约见`src/ambience.schema.json`。`rules`中的`part`为`opening`（起�
 - 静态天气：`clear`、`cloudy`、`lightRain`、`heavyRain`、`lightSnow`、`heavySnow`、`mixed`、`thunder`、`fog`、`polluted`、`windy`、`freezing`、`hot`、`humidHot`。
 - 变化：`becameClear`、`becameCloudy`、`conditionChanged`、`rainStarted`、`rainStopped`、`rainStronger`、`rainWeaker`、`snowStarted`、`snowStopped`、`snowStronger`、`snowWeaker`、`rainToSnow`、`snowToRain`、`precipitationChanged`、`temperatureUp/Down`、`feelsLikeUp/Down`、`windUp/Down`、`visibilityUp/Down`、`uvUp/Down`、`airUp/Down`、`probabilityUp/Down`。`Up/Down`各为独立标签。被动事件只向文案提供本轮变化标签。
 - UV补充条件：`highUv` ≥7、`lowUv` ≤2。空气改善补充条件`clearerAir`表示当前AQI为优/良或Excellent/Good，且能见度高于本段污染开始时；中间改善轮次不前移该基线。
-- 能见度雾气文案要求当前`waterFog`或上次`wasWaterFog`：天气代码为雾、能见度低于2 km且当前空气质量未达4级；空气变差文案另要求`visibilityFell`。不能仅凭能见度变化推断雾或污染。
+- 能见度雾气文案要求当前`waterFog`或上次`wasWaterFog`：对应时点的天气代码为雾、能见度低于2 km且该时点空气质量未达4级。雾散句还要求当前不再是雾代码；未满足时使用不推断成因的能见度句。空气变差文案根据`visibilityFell`或`visibilityNotFallen`选择对应句子。
 - `strongWind`表示风力升高后达到5级，供被动大风句使用。
 - 预警：`alertAdded`、`alertUpgraded`、`alertUpdated`、`alertDowngraded`、`alertCancelled`、`alertRemoved`、`alertExpired`。
 - 预报：`forecastRain`、`forecastCold`、`forecastWarm`、`forecastDailyWarm`、`forecastWet`、`forecastClear`、`forecastStable`、`forecastMild`。近期降雨要求未来两小时内降雨概率>70%；近期冷暖比较这两小时与当前气温，逐日冷暖比较相邻日期的最低/最高温。连续晴雨要求从明天起至少连续两日符合，晴天允许夜间多云，阴雨要求每天至少一个昼夜时段为雨。被动文案只匹配实际变化的时段、日期和气象字段。
 - `forecastStable`要求完整未来两小时均无降水、降水概率<30%、风力<5级、晴或多云、气温与当前相差不足温度阈值；`forecastMild`还要求已有的三小时数据和当前温度都在15–25°C。未取得当前天气时不输出平稳文案。
 - 天文：`sunrise`、`sunset`、`cloudyOrWet`、`calm`。
 
-逐日升温的`forecastDailyWarm`暂留空候选：现有升温句带“待会儿、今天”，仅用于近期逐时预报。`unsupportedNowcast`对应分钟级雨停文案；本扩展不查询分钟级预报，因此不产生该标签。
+补充标签：
+
+- 静态：`thinFog`（薄雾代码且能见度≥2 km）、`lightHaze`（霾代码502）、`lightDust`（扬沙/浮尘代码503/504）。轻霾句另需`notSeverelyPolluted`。
+- 雨雪转换：`mixedStarted`、`mixedStopped`、`snowToMixed`、`mixedToSnow`。
+- 一般天气变化：`cloudIncreased`、`cloudDecreased`、`thunderStarted`、`thunderStopped`、`thunderToRain`、`hazeStarted`、`hazeCleared`、`dustStarted`、`dustCleared`。霾/沙尘消退句只用于转为晴或云天气。
+- 空气与风：`moderateWind`（3–4级）、`goodAir`、`pollutedAir`、`airWithoutClearerView`。空气优良/污染采用对应AQI的类别，不把所有国家的100当成同一界线。
+- 近期预报：`forecastWindUp/Down`、`forecastVisibilityUp/Down`、`forecastUvUp/Down`、`forecastRainWeaker`、`forecastRainStopped`、`forecastSnowStarted`、`forecastSnowStronger`、`forecastSnowWeaker`、`forecastSnowStopped`。根据实况至未来第1、第2小时的顺序比较；被动提醒还要求相应预报时段的对应字段发生修订。UV增强句要求未来UV≥7；雨/雪减弱及停止句要求当前正在下对应降水。含“待会儿”的句子不用于远日预报。
+- 修订：`forecastTemperatureRevisedUp/Down`只描述同一未来时刻的预报温度修订，不当作当前至未来的升降温。
+- 逐日：`forecastDailyWarm`要求未来至少连续三天最低温、最高温均逐日上涨，累计达到温差阈值；`forecastDailyWarmFromTomorrow`还要求这段从明天开始且明天高于今天的逐日极值。
+
+`unsupportedNowcast`仍对应未接入的分钟级雨停句。本扩展不新增分钟级接口；本轮雨停预报使用现有逐时数据。
 
 ## 信息边界
 

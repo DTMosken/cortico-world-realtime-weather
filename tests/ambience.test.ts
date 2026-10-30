@@ -60,4 +60,20 @@ describe('demo文案与部署覆盖', () => {
     expect(copy.render('current', 'passive', '2026-10-31T22:00:00Z', 'UTC', ['becameClear', 'dark'])).toContain('夜空中的云层散开了，清冷的月光重新漏了下来，给窗台镀上了一层淡淡的银白。');
     expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['snowWeaker'])).toContain('漫天飞舞的雪花渐渐稀疏了下来，只剩下零星的雪粒还在空中打着旋儿。');
   });
+  it('天气句和预警句同时保留，预警句始终置后', () => {
+    const { copy } = create();
+    const text = copy.render('current', 'passive', '2026-10-31T14:15:00Z', 'UTC', ['rainStarted', 'alertAdded'], { alertAdded: '暴雨' });
+    expect(text).toContain('雨点开始啪嗒啪嗒地砸在窗户上');
+    expect(text).toContain('刚挂出了暴雨预警');
+    expect(text.indexOf('刚挂出了暴雨预警')).toBeGreaterThan(text.indexOf('雨点开始'));
+    expect(text).toContain('听到手机震了一下，低头扫了一眼弹出的提醒，');
+    expect(text.match(/\[/g)).toHaveLength(1);
+  });
+  it('UV极值候选在随机数接近1时也优先于普通句', () => {
+    const { file } = create();
+    const copy = new Ambience(file, () => 0.999);
+    expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvUp', 'highUv', 'daylight'])).toContain('格外毒辣');
+    expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvDown', 'lowUv', 'daylight'])).toContain('光线变得柔和舒适');
+    expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvDown', 'daylight'])).toContain('伸手拉开窗帘');
+  });
 });
