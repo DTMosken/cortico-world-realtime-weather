@@ -69,6 +69,13 @@ describe('demo文案与部署覆盖', () => {
     expect(text).toContain('听到手机震了一下，低头扫了一眼弹出的提醒，');
     expect(text.match(/\[/g)).toHaveLength(1);
   });
+  it('一般变化使用原句兜底，专用变化仍优先', () => {
+    const { copy } = create();
+    const render = (tags: string[]) => copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', tags);
+    expect(render(['conditionChanged'])).toContain('天气状况不知不觉发生了一点变化');
+    expect(render(['conditionChanged', 'precipitationChanged'])).toContain('窗外落下来的东西变了样');
+    expect(render(['conditionChanged', 'rainStarted'])).toContain('雨点开始啪嗒啪嗒');
+  });
   it('通用视程句只在没有专用条件时选中', () => {
     const { file } = create();
     const copy = new Ambience(file, () => 0.999);

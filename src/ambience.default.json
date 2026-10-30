@@ -654,7 +654,8 @@
       "when": [
         "current",
         "airUp",
-        "clearerAir"
+        "clearerAir",
+        "hazeClearedSinceAirBaseline"
       ],
       "texts": [
         "外面的灰霾终于散干净了，远处的建筑轮廓重新变得清晰起来，推开窗户痛快地换了口气。"
@@ -667,7 +668,8 @@
       "when": [
         "current",
         "airUp",
-        "clearerAir"
+        "clearerAir",
+        "hazeClearedSinceAirBaseline"
       ],
       "texts": [
         "原本浑浊的天空被风吹得干干净净，久违的清透感回来了，起身把窗户敞开通通风。"
@@ -1151,19 +1153,27 @@
       "id": "pending-conditionChanged",
       "part": "body",
       "when": [
+        "current",
         "conditionChanged"
       ],
-      "texts": [],
-      "priority": 50
+      "texts": [
+        "窗外的天色和刚才不太一样了，外面的天气状况不知不觉发生了一点变化。",
+        "外面的天色改变了，空气里的氛围和刚才比起来有了些微妙的不同。"
+      ],
+      "priority": 40
     },
     {
       "id": "pending-precipitationChanged",
       "part": "body",
       "when": [
+        "current",
         "precipitationChanged"
       ],
-      "texts": [],
-      "priority": 50
+      "texts": [
+        "窗外落下来的东西变了样，敲在玻璃和窗沿上的声响听着和刚才截然不同。",
+        "半空中的降水换了种形态，赶紧确认了一下窗户有没有关严实。"
+      ],
+      "priority": 45
     },
     {
       "id": "pending-forecastDailyWarm",
@@ -1655,6 +1665,20 @@
         "预报说雪再过一会儿就停了，盘算着等雪停了要不要出门踩踩雪。"
       ],
       "priority": 30
+    },
+    {
+      "id": "body-current-snow-generic",
+      "part": "body",
+      "when": [
+        "current",
+        "snow"
+      ],
+      "texts": [
+        "窗外正飘着雪，白色的雪花在半空中纷扬落下，给外面的世界添了一分清冷和安静。",
+        "外面正在下雪，雪片轻盈地掠过窗前，屋外的景物看着都覆上了一层冬日特有的寒意。",
+        "半空中飘落着雪花，外面的空气看着清冽而安静，屋里和窗外像是隔出了两个世界。"
+      ],
+      "priority": 19
     }
   ]
 }

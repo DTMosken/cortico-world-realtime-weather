@@ -12,7 +12,7 @@ describe('实况与预报合并', () => {
   ])('%s低风险且视程恢复时匹配空气改善文案', async (standard, high, low) => {
     fixture = await service();
     fixture.air.indexes[0] = { ...fixture.air.indexes[0], code: standard, level: '3', category: high };
-    fixture.current = weather({ visibility: { value: 2000 } });
+    fixture.current = weather({ condition: { code: '502' }, visibility: { value: 2000 } });
     await fixture.world.start(fixture.host);
     for (let i = 0; i < 3; i++) await fixture.world.pollCurrent();
     fixture.air.indexes[0] = { ...fixture.air.indexes[0], level: '1', category: low, aqiDisplay: '2' };
@@ -31,6 +31,18 @@ describe('实况与预报合并', () => {
     fixture.current = weather({ condition: { code }, precipitation: { type: 'snow' } });
     const text = await fixture.world.tools()[0].handler({}, {} as never);
     expect(String(text).includes('鹅毛大雪')).toBe(heavy);
+    if (['401', '407', '457', '499'].includes(code)) expect(String(text)).toContain('窗外正飘着雪');
+  });
+  it.each([['502', '502'], ['104', '104']])('空气改善%s→%s不能套霾散句', async (before, after) => {
+    fixture = await service();
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], level: '3', category: '轻度污染' };
+    fixture.current = weather({ condition: { code: before }, visibility: { value: 3000 } });
+    await fixture.world.start(fixture.host);
+    for (let i = 0; i < 3; i++) await fixture.world.pollCurrent();
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], level: '2', category: '良' };
+    fixture.current = weather({ condition: { code: after }, visibility: { value: 8000 } });
+    await fixture.world.pollCurrent();
+    expect(fixture.events.at(-1)!.text).not.toMatch(/灰霾终于散干净|浑浊的天空被风/);
   });
   it('雾散文案查上一轮AQI，污染改善不能误作水雾散去', async () => {
     fixture = await service();

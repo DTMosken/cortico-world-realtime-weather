@@ -50,6 +50,7 @@ export class RealtimeWeatherWorld implements World {
   private previousForecast?: Forecast;
   private cycle = 0;
   private airVisibilityBaseline?: number;
+  private airHazeBaseline = false;
   private candidates: Location[] = [];
   private readonly now: () => number;
   private readonly open: (file: string) => Promise<void>;
@@ -80,6 +81,7 @@ export class RealtimeWeatherWorld implements World {
     const tags = changes ? ['current', ...changes.map(c => c.id), ...this.tags(weather).filter(t => ['daylight', 'dark', 'calm', 'cloudyOrWet'].includes(t))] : ['current', ...this.tags(weather)];
     if (weather?.uv !== undefined) { if (weather.uv >= 7) tags.push('highUv'); if (weather.uv <= 2) tags.push('lowUv'); }
     if (current.air && goodAir(current.air) && weather?.visibilityKm !== undefined && this.airVisibilityBaseline !== undefined && weather.visibilityKm > this.airVisibilityBaseline) tags.push('clearerAir');
+    if (this.airHazeBaseline && weather && weatherTags(weather).some(tag => ['clear', 'cloudy'].includes(tag))) tags.push('hazeClearedSinceAirBaseline');
     if (!changes && weather && current.air && current.air.level >= 4 && weatherTags(weather).some(t => ['haze', 'dust'].includes(t))) tags.push('polluted');
     if (weather && (weather.windScale ?? 0) >= 5 && changes?.some(c => c.id === 'windUp')) tags.push('strongWind');
     if (weather && weatherTags(weather).includes('fog') && (!current.air || current.air.level < 4)) tags.push('waterFog');
@@ -164,7 +166,10 @@ export class RealtimeWeatherWorld implements World {
       changes.push(...alertChanges(this.previous?.alerts ?? [], current.alerts, this.now(), this.timezone()));
     }
     const receipt = changes.length ? this.currentReceipt(current, 'passive', changes) : '';
-    if (current.air && !current.errors.air && !current.errors.weather && (this.airVisibilityBaseline === undefined || !(this.previous?.air && goodAir(this.previous.air)) && goodAir(current.air) || (this.previous?.air && current.air.level > this.previous.air.level))) this.airVisibilityBaseline = current.weather?.visibilityKm;
+    if (current.air && !current.errors.air && !current.errors.weather && (this.airVisibilityBaseline === undefined || !(this.previous?.air && goodAir(this.previous.air)) && goodAir(current.air) || (this.previous?.air && current.air.level > this.previous.air.level))) {
+      this.airVisibilityBaseline = current.weather?.visibilityKm;
+      this.airHazeBaseline = !!current.weather && weatherTags(current.weather).includes('haze');
+    }
     this.previous = current;
     if (receipt && host && this.host === host && !this.controller.signal.aborted) await this.push('realtime-weather.changed', receipt);
   }
