@@ -11,7 +11,7 @@ import { alertChanges, weatherChanges } from './changes.ts';
 import { clock, isDaylight, solarTimes } from './time.ts';
 import { forecastTags, type ForecastSelection } from './forecast.ts';
 import { airStandard, currentLine, dayLine, forecastLines } from './format.ts';
-import { weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
+import { goodAir, weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
 import { ensureParent, openFile, prepareKeyFile } from './files.ts';
 
 const ENV_PROMPT_FILE = fileURLToPath(new URL('./ENV_PROMPT.md', import.meta.url));
@@ -79,7 +79,7 @@ export class RealtimeWeatherWorld implements World {
     const weather = current.errors.weather ? undefined : current.weather;
     const tags = changes ? ['current', ...changes.map(c => c.id), ...this.tags(weather).filter(t => ['daylight', 'dark', 'calm', 'cloudyOrWet'].includes(t))] : ['current', ...this.tags(weather)];
     if (weather?.uv !== undefined) { if (weather.uv >= 7) tags.push('highUv'); if (weather.uv <= 2) tags.push('lowUv'); }
-    if (current.air && ['优', '良', 'Excellent', 'Good'].includes(current.air.category) && weather?.visibilityKm !== undefined && this.airVisibilityBaseline !== undefined && weather.visibilityKm > this.airVisibilityBaseline) tags.push('clearerAir');
+    if (current.air && goodAir(current.air) && weather?.visibilityKm !== undefined && this.airVisibilityBaseline !== undefined && weather.visibilityKm > this.airVisibilityBaseline) tags.push('clearerAir');
     if (!changes && weather && current.air && current.air.level >= 4 && weatherTags(weather).some(t => ['haze', 'dust'].includes(t))) tags.push('polluted');
     if (weather && (weather.windScale ?? 0) >= 5 && changes?.some(c => c.id === 'windUp')) tags.push('strongWind');
     if (weather && weatherTags(weather).includes('fog') && (!current.air || current.air.level < 4)) tags.push('waterFog');
@@ -87,7 +87,7 @@ export class RealtimeWeatherWorld implements World {
     if (weather?.visibilityKm !== undefined && this.previous?.weather?.visibilityKm !== undefined && weather.visibilityKm < this.previous.weather.visibilityKm) tags.push('visibilityFell');
     if (weather?.windScale !== undefined && weather.windScale >= 3 && weather.windScale < 5) tags.push('moderateWind');
     if (current.air && !current.errors.air) {
-      if (['优', '良', 'Excellent', 'Good'].includes(current.air.category)) tags.push('goodAir');
+      if (goodAir(current.air)) tags.push('goodAir');
       if (['轻度污染', '中度污染', '重度污染', '严重污染', 'Unhealthy for Sensitive Groups', 'Unhealthy', 'Very Unhealthy', 'Hazardous'].includes(current.air.category)) tags.push('pollutedAir');
       if (!tags.includes('clearerAir')) tags.push('airWithoutClearerView');
       if (current.air.level < 4) tags.push('notSeverelyPolluted');
@@ -164,7 +164,7 @@ export class RealtimeWeatherWorld implements World {
       changes.push(...alertChanges(this.previous?.alerts ?? [], current.alerts, this.now(), this.timezone()));
     }
     const receipt = changes.length ? this.currentReceipt(current, 'passive', changes) : '';
-    if (current.air && !current.errors.air && !current.errors.weather && (this.airVisibilityBaseline === undefined || !['优', '良', 'Excellent', 'Good'].includes(this.previous?.air?.category ?? '') && ['优', '良', 'Excellent', 'Good'].includes(current.air.category) || (this.previous?.air && current.air.level > this.previous.air.level))) this.airVisibilityBaseline = current.weather?.visibilityKm;
+    if (current.air && !current.errors.air && !current.errors.weather && (this.airVisibilityBaseline === undefined || !(this.previous?.air && goodAir(this.previous.air)) && goodAir(current.air) || (this.previous?.air && current.air.level > this.previous.air.level))) this.airVisibilityBaseline = current.weather?.visibilityKm;
     this.previous = current;
     if (receipt && host && this.host === host && !this.controller.signal.aborted) await this.push('realtime-weather.changed', receipt);
   }

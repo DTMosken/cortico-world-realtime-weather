@@ -816,17 +816,6 @@
       "priority": 20
     },
     {
-      "id": "forecast-6",
-      "part": "body",
-      "when": [
-        "unsupportedNowcast"
-      ],
-      "texts": [
-        "软件上提示这阵雨马上就过去，看来不用太担心。"
-      ],
-      "priority": 20
-    },
-    {
       "id": "forecast-8",
       "part": "body",
       "when": [

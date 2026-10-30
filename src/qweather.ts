@@ -126,7 +126,12 @@ export class QWeather {
     const index = result.indexes.find(i => i.code !== 'qaqi') ?? result.indexes.find(i => i.code === 'qaqi');
     if (!index) throw new Error('空气质量暂无数据');
     const allowed = ['优', '良', '轻度污染', '中度污染', '重度污染', '严重污染', 'Excellent', 'Good', 'Moderate', 'Unhealthy for Sensitive Groups', 'Unhealthy', 'Very Unhealthy', 'Hazardous'];
-    return { at, standard: index.code, value: index.aqiDisplay, level: Number(index.level), category: allowed.includes(index.category) ? index.category : `等级${index.level}`, primary: POLLUTANTS[index.primaryPollutant?.code ?? ''], pm25: result.pollutants.find(p => p.code === 'pm2p5')?.concentration.value };
+    const riskCategories: Record<string, string[]> = {
+      'ca-eccc': ['Low Risk', 'Moderate Risk', 'High Risk', 'Very High Risk'],
+      'gb-defra': ['Low', 'Moderate', 'High', 'Very High'],
+    };
+    const category = riskCategories[index.code]?.[Number(index.level) - 1] ?? (allowed.includes(index.category) ? index.category : `等级${index.level}`);
+    return { at, standard: index.code, value: index.aqiDisplay, level: Number(index.level), category, primary: POLLUTANTS[index.primaryPollutant?.code ?? ''], pm25: result.pollutants.find(p => p.code === 'pm2p5')?.concentration.value };
   }
   async alerts(signal?: AbortSignal): Promise<Alert[]> {
     const result = await this.get<{ alerts: RawAlert[] }>(`/weatheralert/v1/current/${this.point()}?lang=zh`, signal);

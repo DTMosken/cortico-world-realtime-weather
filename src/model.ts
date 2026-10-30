@@ -84,7 +84,11 @@ export function weatherTags(w: Weather): string[] {
   if (code === 100 || code === 150) tags.push('clear');
   else if (code >= 101 && code <= 104 || code >= 151 && code <= 154) tags.push('cloudy');
   if (w.precipitationType === 'rain') tags.push('rain', (w.precipitationIntensity ?? 0) < 2.5 ? 'lightRain' : 'heavyRain');
-  if (w.precipitationType === 'snow') tags.push('snow', code >= 402 && code <= 410 ? 'heavySnow' : 'lightSnow');
+  if (w.precipitationType === 'snow') {
+    tags.push('snow');
+    if ([402, 403, 409, 410].includes(code)) tags.push('heavySnow');
+    if ([400, 408].includes(code)) tags.push('lightSnow');
+  }
   if (w.precipitationType === 'mixed') tags.push('mixed');
   if ([302, 303, 304].includes(code)) tags.push('thunder');
   if ([500, 501, 509, 510, 514, 515].includes(code) && w.visibilityKm !== undefined && w.visibilityKm < 2) tags.push('fog');
@@ -98,4 +102,9 @@ export function weatherTags(w: Weather): string[] {
   if ((w.temperature ?? -Infinity) > 32 || (w.uv ?? 0) > 7) tags.push('hot');
   if ((w.humidity ?? 0) > 0.8 && (w.temperature ?? 0) >= 28) tags.push('humidHot');
   return tags;
+}
+
+export function goodAir(air: Air): boolean {
+  if (air.standard === 'ca-eccc' || air.standard === 'gb-defra') return air.level === 1;
+  return ['优', '良', 'Excellent', 'Good'].includes(air.category);
 }

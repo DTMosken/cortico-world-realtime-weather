@@ -6,6 +6,32 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it.each([
+    ['ca-eccc', 'High Risk', 'Low Risk'],
+    ['gb-defra', 'High', 'Low'],
+  ])('%s低风险且视程恢复时匹配空气改善文案', async (standard, high, low) => {
+    fixture = await service();
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], code: standard, level: '3', category: high };
+    fixture.current = weather({ visibility: { value: 2000 } });
+    await fixture.world.start(fixture.host);
+    for (let i = 0; i < 3; i++) await fixture.world.pollCurrent();
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], level: '1', category: low, aqiDisplay: '2' };
+    fixture.current = weather({ visibility: { value: 8000 } });
+    await fixture.world.pollCurrent();
+    const text = fixture.events.at(-1)!.text!;
+    expect(text).toContain(low);
+    expect(text).toContain('外面的灰霾终于散干净了');
+    expect(text).not.toContain('等级1');
+  });
+  it.each([
+    ['407', false], ['408', false], ['457', false], ['401', false], ['499', false],
+    ['402', true], ['403', true], ['409', true], ['410', true],
+  ])('降雪代码%s的大雪描述符合强度分类', async (code, heavy) => {
+    fixture = await service();
+    fixture.current = weather({ condition: { code }, precipitation: { type: 'snow' } });
+    const text = await fixture.world.tools()[0].handler({}, {} as never);
+    expect(String(text).includes('鹅毛大雪')).toBe(heavy);
+  });
   it('雾散文案查上一轮AQI，污染改善不能误作水雾散去', async () => {
     fixture = await service();
     fixture.air.indexes[0] = { ...fixture.air.indexes[0], aqiDisplay: '180', level: '4', category: '中度污染' };
