@@ -44,7 +44,7 @@ export class Ambience {
     const candidates = matches.filter(r => r.priority === priority).flatMap(r => r.texts.map(text => ({ text, when: r.when })));
     return candidates.length ? candidates[Math.floor(this.random() * candidates.length)] : undefined;
   }
-  render(kind: 'current' | 'forecast' | 'sunrise' | 'sunset', trigger: 'active' | 'passive', at: string, timezone: string, tags: string[], alertType = '气象'): string {
+  render(kind: 'current' | 'forecast' | 'sunrise' | 'sunset', trigger: 'active' | 'passive', at: string, timezone: string, tags: string[], alertTypes: Record<string, string> = {}): string {
     const all = new Set([kind, trigger, period(at, timezone), ...tags]);
     const complete = this.select('complete', all);
     if (complete) return `[${complete.text}]`;
@@ -54,7 +54,8 @@ export class Ambience {
     const openingTags = new Set([...all].filter(t => t !== kind));
     openingTags.add(openingKind);
     const opening = this.select('opening', openingTags);
-    const text = body.text.replace(/\[(台风\/暴雨\/雷电\/大风|暴雨\/大风\/高温)\]/g, alertType);
+    const alertType = body.when.map(tag => alertTypes[tag]).find(Boolean) ?? '气象';
+    const text = body.text.replace(/\{alertType\}|\[(台风\/暴雨\/雷电\/大风|暴雨\/大风\/高温|暴雨\/大风\/暴雪)\]/g, alertType);
     return `[${opening?.text ?? ''}${text}]`;
   }
 }

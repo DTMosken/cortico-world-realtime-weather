@@ -3,6 +3,7 @@ import { alertGrade, UV_NAMES, uvLevel } from './model.ts';
 import { activeAlerts } from './changes.ts';
 import { clock } from './time.ts';
 
+export const airStandard = (standard: string) => standard === 'cn-mee' ? 'CN' : standard.toUpperCase();
 export const number = (n: number) => String(Math.round(n * 10) / 10);
 export function weatherLine(w: Weather, forecast = false): string {
   const parts = [w.condition + (w.precipitationIntensity === undefined || !['rain', 'snow', 'mixed'].includes(w.precipitationType ?? '') ? '' : `${number(w.precipitationIntensity)} mm/h`)];
@@ -22,10 +23,10 @@ export function alertLine(alert: Alert, timezone: string): string {
   return `${alert.event}${alertGrade(alert)}预警${times.length ? `（${times.join('，')}）` : ''}`;
 }
 export function currentLine(snapshot: Current, timezone: string): string {
-  const parts = [clock(snapshot.at, timezone), snapshot.weather ? weatherLine(snapshot.weather) : '天气暂无数据'];
+  const parts = [clock(snapshot.at, timezone), snapshot.weather ? weatherLine(snapshot.weather) + (snapshot.errors.weather && snapshot.weatherAt ? `（沿用${clock(snapshot.weatherAt, timezone)}）` : '') : '天气暂无数据'];
   if (snapshot.air) {
     const air = snapshot.air;
-    const standard = air.standard === 'cn-mee' ? 'CN' : air.standard === 'qaqi' ? 'QAQI' : air.standard.toUpperCase();
+    const standard = airStandard(air.standard);
     parts.push(`AQI(${standard}) ${air.value}（${air.category}，${clock(air.at, timezone)}）${air.primary ? `，首要${air.primary}` : ''}`);
   } else parts.push('空气质量暂无数据');
   const alerts = activeAlerts(snapshot.alerts, Date.parse(snapshot.at));
@@ -46,5 +47,7 @@ export function dayLine(day: Day): string {
 }
 export function forecastLines(snapshot: Forecast, timezone: string): string {
   const hours = snapshot.hours.filter(h => Date.parse(h.at) > Date.parse(snapshot.at)).slice(0, 2);
-  return [clock(snapshot.at, timezone), ...hours.map(h => `${clock(h.at, timezone)}｜${weatherLine(h, true)}`), ...snapshot.days.map(dayLine), ...Object.entries(snapshot.errors).map(([key, value]) => `${key === 'hours' ? '逐小时' : '多日'}预报${value}`)].join('\n');
+  const missing = [hours.length < 2 ? `未来第${hours.length + 1}${hours.length === 0 ? '、2' : ''}小时暂无预报` : '', !snapshot.days.length ? '多日暂无预报' : ''].filter(Boolean);
+  const stale = [snapshot.errors.hours && snapshot.hoursAt ? `逐小时沿用${clock(snapshot.hoursAt, timezone)}预报` : '', snapshot.errors.days && snapshot.daysAt ? `多日沿用${clock(snapshot.daysAt, timezone)}预报` : ''].filter(Boolean);
+  return [clock(snapshot.at, timezone), ...missing, ...stale, ...hours.map(h => `${clock(h.at, timezone)}｜${weatherLine(h, true)}`), ...snapshot.days.map(dayLine), ...Object.entries(snapshot.errors).map(([key, value]) => `${key === 'hours' ? '逐小时' : '多日'}预报${value}`)].join('\n');
 }

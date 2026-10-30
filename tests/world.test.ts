@@ -74,6 +74,125 @@ describe('实况与预报合并', () => {
     fixture.current = weather({ visibility: { value: 500 } }); await fixture.world.pollCurrent();
     expect(fixture.events).toHaveLength(1); expect(fixture.events[0].text).toContain('能见度'); expect(fixture.events[0].text).not.toContain('[');
   });
+  it('起雾及雾散用新增文案，温度事件不带未变化的污染文案', async () => {
+    fixture = await service(); await fixture.world.start(fixture.host);
+    fixture.current = weather({ condition: { code: '501' }, visibility: { value: 500 } });
+    await fixture.world.pollCurrent();
+    expect(fixture.events.at(-1)?.text).toContain('白茫茫的水汽里');
+    fixture.current = weather(); await fixture.world.pollCurrent();
+    expect(fixture.events.at(-1)?.text).toContain('浓雾终于散开了');
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], aqiDisplay: '160', level: '4', category: '中度污染' };
+    await fixture.world.pollCurrent(); await fixture.world.pollCurrent();
+    fixture.events.length = 0;
+    fixture.current = weather({ temperature: { value: 25, unit: '°C' } });
+    await fixture.world.pollCurrent();
+    expect(fixture.events[0].text).toContain('温度不知不觉爬升');
+    expect(fixture.events[0].text).not.toContain('灰蒙蒙');
+  });
+  it('风力达到5级的变化接上已有大风句', async () => {
+    fixture = await service(); await fixture.world.start(fixture.host);
+    fixture.current = weather({ wind: { scale: 5 } }); await fixture.world.pollCurrent();
+    expect(fixture.events[0].text).toContain('外面刮起了大风');
+  });
+  it('第三小时变化不发事件，远日风力变化不借用近期下雨文案', async () => {
+    fixture = await service();
+    fixture.hours[0] = { ...fixture.hours[0], precipitation: { ...fixture.hours[0].precipitation, type: 'rain', probability: 0.9 } };
+    await fixture.world.start(fixture.host);
+    fixture.hours[2] = { ...fixture.hours[2], temperature: { value: 10, unit: '°C' } };
+    await fixture.world.pollForecast(); expect(fixture.events).toEqual([]);
+    fixture.days[1].daytime = weather({ wind: { scale: 6 } });
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).not.toMatch(/一会儿要下雨|\[/);
+  });
+  it('降水概率升降文案进入合并预报事件', async () => {
+    fixture = await service();
+    fixture.hours[0] = { ...fixture.hours[0], precipitation: { ...fixture.hours[0].precipitation, type: 'rain', probability: 0.4 } };
+    await fixture.world.start(fixture.host);
+    fixture.hours[0] = { ...fixture.hours[0], precipitation: { ...fixture.hours[0].precipitation, type: 'rain', probability: 0.7 } };
+    await fixture.world.pollForecast();
+    expect(fixture.events.at(-1)?.text).toContain('降雨概率突然升高');
+    fixture.hours[0] = { ...fixture.hours[0], precipitation: { ...fixture.hours[0].precipitation, type: 'rain', probability: 0.1 } };
+    await fixture.world.pollForecast();
+    expect(fixture.events.at(-1)?.text).toContain('降水概率已经掉下去了');
+  });
+  it('预报失败轮次保留逐时及逐日的累计温差基线', async () => {
+    fixture = await service(); await fixture.world.start(fixture.host);
+    fixture.hours[0] = { ...fixture.hours[0], temperature: { value: 24, unit: '°C' } };
+    fixture.days[1].temperatureMax = { value: 25 };
+    await fixture.world.pollForecast(); expect(fixture.events).toEqual([]);
+    fixture.errors.hours = 503; fixture.errors.days = 503;
+    await fixture.world.pollForecast(); expect(fixture.events).toEqual([]);
+    delete fixture.errors.hours; delete fixture.errors.days;
+    fixture.hours[0] = { ...fixture.hours[0], temperature: { value: 25, unit: '°C' } };
+    fixture.days[1].temperatureMax = { value: 26 };
+    await fixture.world.pollForecast();
+    expect(fixture.events[0].text).toContain('22°C→25°C');
+    expect(fixture.events[0].text).toContain('15–26°C');
+  });
+  it('失败缓存保留旧数据时间，主动查询可立即重试', async () => {
+    fixture = await service(); await fixture.world.start(fixture.host);
+    fixture.now += REALTIME_WEATHER_CURRENT_INTERVAL_MS;
+    fixture.errors.current = 503;
+    await fixture.world.pollCurrent();
+    const stale = String(await fixture.world.tools()[0].handler({}, {} as never));
+    expect(stale).toContain('沿用17:15');
+    delete fixture.errors.current;
+    fixture.current = weather({ temperature: { value: 28 } });
+    expect(await fixture.world.tools()[0].handler({}, {} as never)).toContain('28°C');
+    fixture.errors.hours = 503; await fixture.world.pollForecast();
+    delete fixture.errors.hours;
+    fixture.hours[0] = { ...fixture.hours[0], temperature: { value: 14, unit: '°C' } };
+    expect(await fixture.world.tools()[1].handler({}, {} as never)).toContain('14°C');
+  });
+  it('空气失败仍按四轮查询，不在中间轮次重试', async () => {
+    fixture = await service(); fixture.errors.air = 503; await fixture.world.start(fixture.host);
+    for (let i = 0; i < 3; i++) await fixture.world.pollCurrent();
+    expect(fixture.counts.air).toBe(1);
+    delete fixture.errors.air; await fixture.world.pollCurrent();
+    expect(fixture.counts.air).toBe(2);
+  });
+  it('空气分阶段改善时保留污染期能见度基线，回执使用CN简称', async () => {
+    fixture = await service();
+    fixture.current = weather({ visibility: { value: 3000 }, condition: { code: '502' } });
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], aqiDisplay: '180', level: '4', category: '中度污染' };
+    await fixture.world.start(fixture.host);
+    fixture.current = weather({ visibility: { value: 8000 } });
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], aqiDisplay: '120', level: '3', category: '轻度污染' };
+    for (let i = 0; i < 4; i++) { fixture.now += REALTIME_WEATHER_CURRENT_INTERVAL_MS; await fixture.world.pollCurrent(); }
+    fixture.events.length = 0;
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], aqiDisplay: '85', level: '2', category: '良' };
+    for (let i = 0; i < 4; i++) { fixture.now += REALTIME_WEATHER_CURRENT_INTERVAL_MS; await fixture.world.pollCurrent(); }
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).toContain('AQI(CN)');
+    expect(fixture.events[0].text).toContain('外面的灰霾终于散干净了');
+  });
+  it('预警解除文案填被解除的类型，其他仍有效预警不干扰', async () => {
+    fixture = await service();
+    const a = { id: 'wind-a', eventType: { name: 'wind', code: '1006' }, severity: 'severe', messageType: { code: 'alert' } };
+    const b = { ...a, id: 'ice-a', eventType: { name: 'PRIVATE_LOCATION', code: '1021' } };
+    fixture.alerts = [a, b]; await fixture.world.start(fixture.host); fixture.events.length = 0;
+    fixture.alerts = [a]; await fixture.world.pollCurrent();
+    expect(fixture.events[0].text).toContain('道路结冰预警总算解除了');
+    expect(fixture.events[0].text).not.toMatch(/PRIVATE_|大风预警总算/);
+  });
+  it('主动实况在途时第四轮仍合并空气刷新，只请求一次天气与预警', async () => {
+    fixture = await service(); await fixture.world.start(fixture.host);
+    for (let i = 0; i < 3; i++) await fixture.world.pollCurrent();
+    fixture.now += REALTIME_WEATHER_CURRENT_INTERVAL_MS;
+    let release!: () => void;
+    fixture.holds.current = new Promise<void>(resolve => { release = resolve; });
+    const before = { ...fixture.counts };
+    const active = fixture.world.tools()[0].handler({}, {} as never);
+    try {
+      await vi.waitFor(() => expect(fixture!.counts.current).toBe(before.current + 1));
+      fixture.air.indexes[0].aqiDisplay = '95';
+      const passive = fixture.world.pollCurrent();
+      release();
+      expect(await active).toContain('95'); await passive;
+      expect(fixture.counts).toMatchObject({ current: before.current + 1, alerts: before.alerts + 1, air: before.air + 1 });
+    } finally { release(); await active; }
+  });
   it('默认配置可构造、读取声明和挂载，不请求真实服务', async () => {
     fixture = await service(); fixture.cfg.apiHost = ''; fixture.cfg.location = null;
     await fixture.world.start(fixture.host);

@@ -50,15 +50,19 @@ export interface Current {
   weather?: Weather;
   air?: Air;
   alerts: Alert[];
+  weatherAt?: string;
+  alertsAt?: string;
   errors: Partial<Record<'weather' | 'air' | 'alerts', string>>;
 }
 export interface Forecast {
   at: string;
   hours: Hour[];
   days: Day[];
+  hoursAt?: string;
+  daysAt?: string;
   errors: Partial<Record<'hours' | 'days', string>>;
 }
-export interface Change { id: string; text: string }
+export interface Change { id: string; text: string; alertType?: string }
 
 export function uvLevel(value: number): number {
   return value < 3 ? 0 : value < 6 ? 1 : value < 8 ? 2 : value < 11 ? 3 : 4;
@@ -70,6 +74,10 @@ export function alertGrade(alert: Alert): string {
   return colors[alert.color ?? ''] ?? severity[alert.severity] ?? '';
 }
 
+export function conditionCode(code: string): string {
+  return ({ '150': '100', '151': '101', '152': '102', '153': '103', '350': '300', '351': '301', '456': '406', '457': '407' } as Record<string, string>)[code] ?? code;
+}
+
 export function weatherTags(w: Weather): string[] {
   const code = Number(w.conditionCode);
   const tags: string[] = [];
@@ -79,7 +87,7 @@ export function weatherTags(w: Weather): string[] {
   if (w.precipitationType === 'snow') tags.push('snow', code >= 402 && code <= 410 ? 'heavySnow' : 'lightSnow');
   if (w.precipitationType === 'mixed') tags.push('mixed');
   if ([302, 303, 304].includes(code)) tags.push('thunder');
-  if ([501, 509, 510, 514, 515].includes(code)) tags.push('fog');
+  if ([500, 501, 509, 510, 514, 515].includes(code) && w.visibilityKm !== undefined && w.visibilityKm < 2) tags.push('fog');
   if ([502, 511, 512, 513].includes(code)) tags.push('haze');
   if ([503, 504, 507, 508].includes(code)) tags.push('dust');
   if ((w.windScale ?? 0) >= 5) tags.push('windy');

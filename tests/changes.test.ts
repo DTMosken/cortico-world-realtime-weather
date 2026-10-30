@@ -20,4 +20,32 @@ describe('双向变化', () => {
     expect(alertChanges([cancel], [cancel], 0)).toEqual([]); expect(alertChanges([cancel], [], 0)).toEqual([]);
     expect(activeAlerts([cancel], 0)).toEqual([]);
   });
+  it.each([['100', '150'], ['101', '151'], ['300', '350'], ['406', '456']])('昼夜代码%s/%s不产生虚假变化', (day, night) => {
+    expect(weatherChanges({ ...base, conditionCode: day }, { ...base, conditionCode: night }, REALTIME_WEATHER_DEFAULTS).changes).toEqual([]);
+  });
+  it('雪停转阴不描述成晴转阴，雨雪切换使用专属变化', () => {
+    const snow = { ...base, conditionCode: '400', condition: '小雪', precipitationType: 'snow' };
+    expect(weatherChanges(snow, { ...base, conditionCode: '104', condition: '阴' }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toEqual(['conditionChanged', 'snowStopped']);
+    expect(weatherChanges({ ...base, precipitationType: 'rain' }, snow, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toContain('rainToSnow');
+    expect(weatherChanges(snow, { ...base, precipitationType: 'rain' }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toContain('snowToRain');
+  });
+  it.each(['315', '308', '318'])('小雨转%s无强度字段时仍识别增强', code => {
+    expect(weatherChanges({ ...base, conditionCode: '305', precipitationType: 'rain' }, { ...base, conditionCode: code, precipitationType: 'rain' }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toContain('rainStronger');
+  });
+  it('阵雨类型本身不当作零强度，存在强度时识别其变化', () => {
+    const rain = { ...base, conditionCode: '305', precipitationType: 'rain' };
+    expect(weatherChanges(rain, { ...rain, conditionCode: '302' }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).not.toContain('rainWeaker');
+    expect(weatherChanges({ ...rain, conditionCode: '300', precipitationIntensity: 1 }, { ...rain, conditionCode: '300', precipitationIntensity: 9 }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toContain('rainStronger');
+  });
+  it('忽略未知前序取消与同批已被取代的消息，区分升级和普通更新', () => {
+    const old: Alert = { id: 'a', event: '寒潮', severity: 'moderate', color: 'yellow', kind: 'alert', supersedes: [] };
+    const next: Alert = { ...old, id: 'b', color: 'orange', kind: 'update', supersedes: ['a'] };
+    const cancel: Alert = { ...next, id: 'c', kind: 'cancel', supersedes: ['b'] };
+    expect(alertChanges([], [cancel], 0)).toEqual([]);
+    expect(alertChanges([], [old, next, cancel], 0)).toEqual([]);
+    expect(alertChanges([old], [next, cancel], 0).map(c => c.id)).toEqual(['alertCancelled']);
+    expect(activeAlerts([old, next], 0)).toEqual([next]);
+    expect(alertChanges([old], [old, next], 0).map(c => c.id)).toEqual(['alertUpgraded']);
+    expect(alertChanges([old], [{ ...next, color: 'yellow' }], 0).map(c => c.id)).toEqual(['alertUpdated']);
+  });
 });

@@ -319,7 +319,8 @@
       "when": [
         "current",
         "hot",
-        "daylight"
+        "daylight",
+        "clear"
       ],
       "texts": [
         "外面的阳光很刺眼，热浪隔着玻璃都能感觉到，还是待在空调房里比较好。"
@@ -471,18 +472,6 @@
       "priority": 20
     },
     {
-      "id": "body-current-fog-0",
-      "part": "body",
-      "when": [
-        "current",
-        "fog"
-      ],
-      "texts": [
-        "窗外白茫茫一片，远处的建筑都隐没在了雾气里。"
-      ],
-      "priority": 20
-    },
-    {
       "id": "body-current-becameCloudy-daylight-0",
       "part": "body",
       "when": [
@@ -585,7 +574,8 @@
       "part": "body",
       "when": [
         "current",
-        "airDown"
+        "airDown",
+        "visibilityFell"
       ],
       "texts": [
         "外面的能见度变差了，顺手关紧了窗户。"
@@ -614,7 +604,7 @@
         "daylight"
       ],
       "texts": [
-        "外面的阳光变得格外毒辣，明晃晃地刺得人眼睛发酸，顺手把窗帘拉上了一半遮光。"
+        "外面的阳光变得格外毒辣，明晃晃地刺得人眼睛发酸，顺手把窗帘拉上了一半。"
       ],
       "priority": 55
     },
@@ -624,11 +614,10 @@
       "when": [
         "current",
         "uvUp",
-        "highUv",
         "daylight"
       ],
       "texts": [
-        "太阳越升越高，照在窗台上的光线变得灼人起来，看来现在出门不涂防晒或者不打伞是不行了。"
+        "太阳越升越高，照在窗台上的光线变得灼人起来，看来现在出门需要注意防晒。"
       ],
       "priority": 55
     },
@@ -652,11 +641,10 @@
       "when": [
         "current",
         "uvDown",
-        "lowUv",
         "daylight"
       ],
       "texts": [
-        "灼人的阳光收敛了不少，伸手拉开之前遮光的窗帘，让温和的自然光透进屋里。"
+        "灼人的阳光收敛了不少，伸手拉开窗帘，让温和的光透进屋里。"
       ],
       "priority": 55
     },
@@ -669,7 +657,7 @@
         "clearerAir"
       ],
       "texts": [
-        "外面的灰霾终于散干净了，远处的建筑轮廓重新变得清晰起来，果断关掉空气净化器，推开窗户痛快地换了口气。"
+        "外面的灰霾终于散干净了，远处的建筑轮廓重新变得清晰起来，推开窗户痛快地换了口气。"
       ],
       "priority": 55
     },
@@ -682,7 +670,7 @@
         "clearerAir"
       ],
       "texts": [
-        "原本浑浊的天空被风吹得干干净净，久违的清透感回来了，赶紧起身把屋里的窗户敞开通风。"
+        "原本浑浊的天空被风吹得干干净净，久违的清透感回来了，起身把窗户敞开通通风。"
       ],
       "priority": 55
     },
@@ -719,7 +707,7 @@
       "texts": [
         "听见窗外早起的鸟鸣，起身拉开窗帘，迎着初升的微光呼吸了一口清晨微凉的空气。"
       ],
-      "priority": 1
+      "priority": 2
     },
     {
       "id": "sunrise-4",
@@ -766,7 +754,7 @@
       "texts": [
         "太阳落山了，白天的燥热正在散去，看了一眼窗外渐暗的天色，起身打开了屋里的灯。"
       ],
-      "priority": 1
+      "priority": 2
     },
     {
       "id": "sunset-3",
@@ -779,7 +767,7 @@
       "texts": [
         "暮色四合，最后一抹余晖正在天际线消失，晚风吹动窗帘，带来了一丝傍晚的凉意。"
       ],
-      "priority": 3
+      "priority": 2
     },
     {
       "id": "sunset-4",
@@ -889,7 +877,7 @@
         "alertAdded"
       ],
       "texts": [
-        "刚挂出了[暴雨/大风/高温]预警，外面的情况可能不太妙，今天还是尽量待在屋里别乱跑了。"
+        "刚挂出了{alertType}预警，外面的情况可能不太妙，今天还是尽量待在屋里别乱跑了。"
       ],
       "priority": 20
     },
@@ -900,8 +888,8 @@
         "alertCancelled"
       ],
       "texts": [
-        "之前挂着的[台风/暴雨/雷电/大风]预警总算解除了，悬着的心放了下来，紧绷的神经也跟着松快了不少。",
-        "上面的恶劣天气预警图标终于消失了，看了一眼逐渐恢复平静的窗外，看来最难熬的那阵子已经过去了。"
+        "之前挂着的{alertType}预警总算解除了，悬着的心放了下来，紧绷的神经也跟着松快了不少。",
+        "上面的恶劣天气预警图标终于消失了，看了一眼逐渐恢复平静的窗外，最难熬的那阵子已经过去了。"
       ],
       "priority": 60
     },
@@ -923,106 +911,276 @@
         "alertRemoved"
       ],
       "texts": [
-        "之前挂着的[台风/暴雨/雷电/大风]预警总算解除了，悬着的心放了下来，紧绷的神经也跟着松快了不少。",
-        "上面的恶劣天气预警图标终于消失了，看了一眼逐渐恢复平静的窗外，看来最难熬的那阵子已经过去了。"
+        "之前挂着的{alertType}预警总算解除了，悬着的心放了下来，紧绷的神经也跟着松快了不少。",
+        "上面的恶劣天气预警图标终于消失了，看了一眼逐渐恢复平静的窗外，最难熬的那阵子已经过去了。"
       ],
       "priority": 60
     },
     {
-      "id": "pending-snowStopped",
+      "id": "body-snowStronger",
       "part": "body",
       "when": [
-        "snowStopped"
-      ],
-      "texts": [],
-      "priority": 50
-    },
-    {
-      "id": "pending-snowStronger",
-      "part": "body",
-      "when": [
+        "current",
         "snowStronger"
       ],
-      "texts": [],
+      "texts": [
+        "窗外的雪越下越大了，密集的雪片扑簌簌地往下落，外面的视线都变得有些模糊。"
+      ],
       "priority": 50
     },
     {
-      "id": "pending-snowWeaker",
+      "id": "body-snowWeaker",
       "part": "body",
       "when": [
+        "current",
         "snowWeaker"
       ],
-      "texts": [],
+      "texts": [
+        "漫天飞舞的雪花渐渐稀疏了下来，只剩下零星的雪粒还在空中打着旋儿。"
+      ],
       "priority": 50
     },
     {
-      "id": "pending-windDown",
+      "id": "body-snowStopped",
       "part": "body",
       "when": [
+        "current",
+        "snowStopped"
+      ],
+      "texts": [
+        "雪终于停了，窗外覆盖着一层安静的白，整个世界显得格外清冷干净。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-rainToSnow",
+      "part": "body",
+      "when": [
+        "current",
+        "rainToSnow"
+      ],
+      "texts": [
+        "砸在玻璃上的雨滴不知不觉变成了细碎的冰粒，紧接着就夹杂着雪花飘落下来，外面的寒意瞬间重了几分。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-snowToRain",
+      "part": "body",
+      "when": [
+        "current",
+        "snowToRain"
+      ],
+      "texts": [
+        "空中飘着的雪花渐渐化成了冷雨，窗沿和地面上的薄雪正一点点变成湿冷的泥水。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-windDown",
+      "part": "body",
+      "when": [
+        "current",
         "windDown"
       ],
-      "texts": [],
+      "texts": [
+        "吹进窗缝的气流变缓了，外面的风声慢慢轻了下去，周围安静了几分。"
+      ],
       "priority": 50
     },
     {
-      "id": "pending-temperatureUp",
+      "id": "body-temperatureUp",
       "part": "body",
       "when": [
+        "current",
         "temperatureUp"
       ],
-      "texts": [],
+      "texts": [
+        "温度不知不觉爬升了上来，待在屋里觉得比刚才热乎了不少。"
+      ],
       "priority": 50
     },
     {
-      "id": "pending-feelsLikeUp",
+      "id": "body-feelsLikeUp",
       "part": "body",
       "when": [
+        "current",
         "feelsLikeUp"
       ],
-      "texts": [],
+      "texts": [
+        "不知怎么的，感觉身上比刚才热了一些，顺手挽起了袖子。"
+      ],
       "priority": 50
     },
     {
-      "id": "pending-visibilityUp",
+      "id": "body-visibilityDown",
       "part": "body",
       "when": [
-        "visibilityUp"
+        "current",
+        "visibilityDown",
+        "waterFog"
       ],
-      "texts": [],
+      "texts": [
+        "窗外不知什么时候起了一层雾气，远处的楼房和街景渐渐隐没在白茫茫的水汽里。"
+      ],
       "priority": 50
     },
     {
-      "id": "pending-visibilityDown",
+      "id": "body-visibilityUp",
       "part": "body",
       "when": [
-        "visibilityDown"
+        "current",
+        "visibilityUp",
+        "wasWaterFog"
       ],
-      "texts": [],
+      "texts": [
+        "笼罩在窗外的浓雾终于散开了，原本模糊的街道和远处的建筑重新变得清晰通透起来。"
+      ],
       "priority": 50
     },
     {
-      "id": "pending-alertExpired",
+      "id": "body-probabilityUp",
+      "part": "body",
+      "when": [
+        "forecast",
+        "probabilityUp"
+      ],
+      "texts": [
+        "上面显示的降雨概率突然升高了，一会可能会下雨。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-probabilityDown",
+      "part": "body",
+      "when": [
+        "forecast",
+        "probabilityDown"
+      ],
+      "texts": [
+        "原本说很有可能下的雨，现在的降水概率已经掉下去了。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-alertUpgraded",
+      "part": "body",
+      "when": [
+        "alertUpgraded"
+      ],
+      "texts": [
+        "上面的{alertType}预警信号升级成更刺眼的颜色了，情况似乎比预想的还要严重，默默去检查了一遍门窗。"
+      ],
+      "priority": 60
+    },
+    {
+      "id": "body-alertUpdated",
+      "part": "body",
+      "when": [
+        "alertUpdated"
+      ],
+      "texts": [
+        "气象台又更新了一次预警信息，看来外面的恶劣天气还得再持续好一阵子。"
+      ],
+      "priority": 60
+    },
+    {
+      "id": "body-alertExpired",
       "part": "body",
       "when": [
         "alertExpired"
       ],
-      "texts": [],
+      "texts": [
+        "之前挂着的天气预警已经到期了，外面的天色看着也平稳了下来，总算恢复了日常的节奏。"
+      ],
+      "priority": 60
+    },
+    {
+      "id": "body-windUp",
+      "part": "body",
+      "when": [
+        "current",
+        "windUp",
+        "strongWind"
+      ],
+      "texts": [
+        "外面刮起了大风，吹得树枝大幅度摇晃，窗户框都有些轻微作响。"
+      ],
       "priority": 50
     },
     {
-      "id": "pending-probabilityUp",
+      "id": "body-becameCloudy-dark",
       "part": "body",
       "when": [
-        "probabilityUp"
+        "current",
+        "becameCloudy",
+        "dark"
+      ],
+      "texts": [
+        "窗外原本还能看见的几颗星星和月光被厚云层彻底遮住了，夜色变得更加深沉暗淡。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "body-becameClear-dark",
+      "part": "body",
+      "when": [
+        "current",
+        "becameClear",
+        "dark"
+      ],
+      "texts": [
+        "夜空中的云层散开了，清冷的月光重新漏了下来，给窗台镀上了一层淡淡的银白。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "forecast-stable",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastStable"
+      ],
+      "texts": [
+        "接下来的天气相当平稳，温度和现在差不了多少，是个没什么波澜、让人省心的日常天。"
+      ],
+      "priority": 10
+    },
+    {
+      "id": "forecast-mild",
+      "part": "body",
+      "when": [
+        "forecast",
+        "forecastMild"
+      ],
+      "texts": [
+        "未来好几个小时都是这样温和的天气，既不冷也不热，也不用操心带伞或者增减衣服的事。"
+      ],
+      "priority": 10
+    },
+    {
+      "id": "pending-conditionChanged",
+      "part": "body",
+      "when": [
+        "conditionChanged"
       ],
       "texts": [],
       "priority": 50
     },
     {
-      "id": "pending-probabilityDown",
+      "id": "pending-precipitationChanged",
       "part": "body",
       "when": [
-        "probabilityDown"
+        "precipitationChanged"
+      ],
+      "texts": [],
+      "priority": 50
+    },
+    {
+      "id": "pending-forecastDailyWarm",
+      "part": "body",
+      "when": [
+        "forecastDailyWarm"
       ],
       "texts": [],
       "priority": 50

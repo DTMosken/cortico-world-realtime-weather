@@ -12,11 +12,12 @@ function create() {
   return { file, copy: new Ambience(file, () => 0) };
 }
 describe('demo文案与部署覆盖', () => {
-  it('开始下雨按demo拼装；纯UV未达到补充条件时只发数据', () => {
+  it('开始下雨按demo拼装；日间UV跨级匹配普通及极值候选', () => {
     const { copy } = create();
     const text = copy.render('current', 'passive', '2026-10-31T14:15:00Z', 'UTC', ['rainStarted']);
     expect(text).toBe('[正忙着，余光瞥见屋里的光线变了，下意识抬头望向窗外，空气里的湿气重了起来，雨点开始啪嗒啪嗒地砸在窗户上，赶紧起身把窗关小了些。]');
     expect(copy.render('current', 'passive', '2026-10-31T14:15:00Z', 'UTC', ['uvUp'])).toBe('');
+    expect(copy.render('current', 'passive', '2026-10-31T14:15:00Z', 'UTC', ['uvUp', 'daylight'])).toContain('需要注意防晒');
     expect(copy.render('current', 'passive', '2026-10-31T14:15:00Z', 'UTC', ['uvUp', 'highUv', 'daylight'])).toContain('外面的阳光变得格外毒辣');
   });
   it('损坏JSON整份回退，保留损坏文件；一键恢复写回默认', () => {
@@ -46,5 +47,17 @@ describe('demo文案与部署覆盖', () => {
     const text = copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['alertDowngraded']);
     expect(text).toContain('预警信号降级了，外面的风声雨势也确实没有预想中那么吓人了，稍微松了一口气。');
     expect(text).not.toContain('总算解除了');
+  });
+  it('通用占位符与选中的预警变化对应，支持清单外类型', () => {
+    const { copy } = create();
+    const text = copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['alertAdded', 'alertCancelled'], { alertAdded: '大风', alertCancelled: '道路结冰' });
+    expect(text).toContain('道路结冰预警总算解除了');
+    expect(text).not.toMatch(/\{alertType\}|大风预警/);
+    expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['alertUpgraded'], { alertUpgraded: '洪水' })).toContain('洪水预警信号升级');
+  });
+  it('新增夜间和雪势文案保持原句', () => {
+    const { copy } = create();
+    expect(copy.render('current', 'passive', '2026-10-31T22:00:00Z', 'UTC', ['becameClear', 'dark'])).toContain('夜空中的云层散开了，清冷的月光重新漏了下来，给窗台镀上了一层淡淡的银白。');
+    expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['snowWeaker'])).toContain('漫天飞舞的雪花渐渐稀疏了下来，只剩下零星的雪粒还在空中打着旋儿。');
   });
 });

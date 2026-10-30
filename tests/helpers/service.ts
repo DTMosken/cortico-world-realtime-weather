@@ -19,13 +19,15 @@ export async function service() {
   let air = { indexes: [{ code: 'cn-mee', aqiDisplay: '85', level: '2', category: '良', primaryPollutant: { code: 'pm2p5' } }], pollutants: [{ code: 'pm2p5', concentration: { value: 48 } }], stations: [{ name: 'PRIVATE_LOCATION' }] };
   const counts = { current: 0, alerts: 0, air: 0, hours: 0, days: 0, cities: 0 };
   const errors: Record<string, number> = {};
+  const holds: Partial<Record<string, Promise<void>>> = {};
   const headerKeys: string[] = [];
-  const server = createServer((req, res) => {
+  const server = createServer(async (req, res) => {
     const path = req.url!;
     headerKeys.push(String(req.headers['x-qw-api-key']));
     res.setHeader('Content-Type', 'application/json');
     const route = path.includes('/weather/v1/current/') ? 'current' : path.includes('/weatheralert/') ? 'alerts' : path.includes('/airquality/') ? 'air' : path.includes('/hourly/') ? 'hours' : path.includes('/daily/') ? 'days' : 'cities';
     counts[route]++;
+    if (holds[route]) await holds[route];
     if (errors[route]) { res.writeHead(errors[route]); res.end(JSON.stringify({ detail: 'PRIVATE_LOCATION 42.33 101.12 PRIVATE_KEY' })); return; }
     const data = route === 'current' ? current : route === 'alerts' ? { alerts } : route === 'air' ? air : route === 'hours' ? { hours } : route === 'days' ? { days } : { code: '200', location: [{ id: 'example-city', name: 'PRIVATE_LOCATION', country: 'Example', adm1: 'North', adm2: 'District', lat: '42.33', lon: '101.12', tz: 'Australia/Sydney' }] };
     res.end(JSON.stringify({ ...data, metadata: { attributions: ['Example weather data'] } }));
@@ -43,7 +45,7 @@ export async function service() {
   const events: EventEnvelope[] = [];
   const host = { pushEvent: async (e: EventEnvelope) => { events.push(e); return e; }, log: { warn: () => {} } } as unknown as WorldHost;
   const world = new RealtimeWeatherWorld(context, { request, now: () => now, openFile: async () => {}, random: () => 0 });
-  return { world, host, events, cfg, context, request, counts, errors, headerKeys, botDir,
+  return { world, host, events, cfg, context, request, counts, errors, holds, headerKeys, botDir,
     get now() { return now; }, set now(value: number) { now = value; },
     get current() { return current; }, set current(value) { current = value; },
     get hours() { return hours; }, set hours(value) { hours = value; },
