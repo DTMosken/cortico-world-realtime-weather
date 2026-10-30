@@ -6,9 +6,40 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it.each([["qaqi", 2, 4, 6], ["cn-mee", 2, 3, 6], ["cn-mee-1h", 2, 3, 6], ["hk-epd", 1, 3, 5], ["mo-smg", 1, 3, 6], ["tw-me", 1, 3, 6], ["tw-me-1h", 1, 3, 6], ["us-epa", 1, 3, 6], ["us-epa-nc", 1, 3, 6], ["eu-eea", 2, 4, 6], ["fr-atmo", 1, 3, 6], ["kr-moe", 1, 3, 4], ["jp-moe", 3, 4, 6], ["gb-defra", 1, 3, 4], ["ca-eccc", 1, 3, 4], ["sg-nea", 1, 3, 5], ["sg-nea-pm1h", 1, 2, 4], ["th-pcd", 2, 4, 5]])('%s按本地标准匹配改善、变差和良好文案', async (standard, good, polluted, worst) => {
+    fixture = await service();
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], code: standard, level: String(worst), category: 'PRIVATE_LOCATION 42.33' };
+    await fixture.world.start(fixture.host);
+    const update = async (level: number) => {
+      fixture!.air.indexes[0].level = String(level);
+      for (let i = 0; i < 4; i++) await fixture!.world.pollCurrent();
+      return fixture!.events.at(-1)!.text!;
+    };
+    expect(await update(polluted)).toContain('窗户还是先关着比较好');
+    expect(await update(good)).toContain('总算可以推开窗痛快地换口气');
+    const bad = await update(polluted);
+    expect(bad).toContain('赶紧起身把窗户关严实了');
+    expect(fixture.events.map(e => e.text).join('')).not.toContain('PRIVATE_LOCATION');
+  });
   it.each([
-    ['ca-eccc', 'High Risk', 'Low Risk'],
-    ['gb-defra', 'High', 'Low'],
+    ['ca-eccc', 3], ['gb-defra', 3], ['hk-epd', 3], ['kr-moe', 3],
+    ['sg-nea', 3], ['sg-nea-pm1h', 3], ['jp-moe', 5],
+  ])('%s较高风险不按统一4级误选轻霾或水雾句', async (standard, level) => {
+    fixture = await service();
+    fixture.air.indexes[0] = { ...fixture.air.indexes[0], code: standard, level: String(level) };
+    fixture.current = weather({ condition: { code: '502' } });
+    await fixture.world.start(fixture.host);
+    const text = String(await fixture.world.tools()[0].handler({}, {} as never));
+    expect(text).toContain('空气看起来很浑浊');
+    expect(text).not.toContain('带着一点灰蒙蒙');
+    fixture.current = weather({ condition: { code: '501' }, visibility: { value: 500 } });
+    await fixture.world.pollCurrent();
+    expect(fixture.events.at(-1)!.text).not.toContain('白茫茫的水汽');
+  });
+
+  it.each([
+    ['ca-eccc', '高风险', '低风险'],
+    ['gb-defra', '高', '低'],
   ])('%s低风险且视程恢复时匹配空气改善文案', async (standard, high, low) => {
     fixture = await service();
     fixture.air.indexes[0] = { ...fixture.air.indexes[0], code: standard, level: '3', category: high };
@@ -55,8 +86,9 @@ describe('实况与预报合并', () => {
     await fixture.world.pollCurrent();
     const text = fixture.events.at(-1)!.text!;
     if (after === 'none') {
-      expect(text).toContain('当前无降水');
-      expect(text).not.toContain('[');
+      expect(text).toContain('特殊降水停止');
+      expect(text).toContain('外面噼里啪啦的动静总算消停了');
+      expect(text).not.toContain('窗外落下来的东西变了样');
     } else expect(text).toContain('窗外落下来的东西变了样');
   });
   it('雾散文案查上一轮AQI，污染改善不能误作水雾散去', async () => {

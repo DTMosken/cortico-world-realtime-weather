@@ -1679,6 +1679,19 @@
         "半空中飘落着雪花，外面的空气看着清冽而安静，屋里和窗外像是隔出了两个世界。"
       ],
       "priority": 19
+    },
+    {
+      "id": "body-precipitationStopped",
+      "part": "body",
+      "when": [
+        "current",
+        "precipitationStopped"
+      ],
+      "texts": [
+        "外面噼里啪啦的动静总算消停了，窗沿上只留下一道道湿冷的痕迹。",
+        "敲打着窗户的声响终于停了下来，外面恢复了安静，只是地面看着还有些湿滑。"
+      ],
+      "priority": 50
     }
   ]
 }

@@ -5,6 +5,15 @@ import type { Alert, Weather } from '../src/model.ts';
 const base: Weather = { conditionCode: '100', condition: '晴', temperature: 22, feelsLike: 22, precipitationType: 'none', visibilityKm: 8, uv: 2, windScale: 2 };
 describe('双向变化', () => {
   it.each([
+    ['ice', '999', 'precipitationStopped'], ['rain', '313', 'precipitationStopped'],
+    ['unknown', '999', 'precipitationUpdated'], ['rain', '305', 'rainStopped'],
+  ])('%s/%s结束时区分特殊降水、普通雨和未知状态', (type, code, expected) => {
+    const before = { ...base, conditionCode: code, precipitationType: type };
+    const after = { ...before, precipitationType: 'none' };
+    expect(weatherChanges(before, after, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toEqual([expected]);
+  });
+
+  it.each([
     ['none', 'mixed', 'mixedStarted'], ['mixed', 'none', 'mixedStopped'],
     ['snow', 'mixed', 'snowToMixed'], ['mixed', 'snow', 'mixedToSnow'],
   ])('雨夹雪转换%s→%s不混用开始下雪', (before, after, tag) => {

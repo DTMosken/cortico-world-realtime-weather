@@ -103,8 +103,3 @@ export function weatherTags(w: Weather): string[] {
   if ((w.humidity ?? 0) > 0.8 && (w.temperature ?? 0) >= 28) tags.push('humidHot');
   return tags;
 }
-
-export function goodAir(air: Air): boolean {
-  if (air.standard === 'ca-eccc' || air.standard === 'gb-defra') return air.level === 1;
-  return ['优', '良', 'Excellent', 'Good'].includes(air.category);
-}

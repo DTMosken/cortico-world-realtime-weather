@@ -1,3 +1,4 @@
+import { goodAir, pollutedAir, highAirRisk, lowerAirRisk } from './air-quality.ts';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import type { ToolDef, World, WorldHost, WorldWebUiDecl } from 'cortico/core/types.ts';
@@ -11,7 +12,7 @@ import { alertChanges, weatherChanges } from './changes.ts';
 import { clock, isDaylight, solarTimes } from './time.ts';
 import { forecastTags, type ForecastSelection } from './forecast.ts';
 import { airStandard, currentLine, dayLine, forecastLines } from './format.ts';
-import { goodAir, weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
+import { weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
 import { ensureParent, openFile, prepareKeyFile } from './files.ts';
 
 const ENV_PROMPT_FILE = fileURLToPath(new URL('./ENV_PROMPT.md', import.meta.url));
@@ -83,17 +84,17 @@ export class RealtimeWeatherWorld implements World {
     if (current.air && goodAir(current.air) && weather?.visibilityKm !== undefined && this.airVisibilityBaseline !== undefined && weather.visibilityKm > this.airVisibilityBaseline) tags.push('clearerAir');
     if (weather && weatherTags(weather).some(tag => ['clear', 'cloudy'].includes(tag))) tags.push('clearAirWeather');
     if (this.airHazeBaseline && weather && weatherTags(weather).some(tag => ['clear', 'cloudy'].includes(tag))) tags.push('hazeClearedSinceAirBaseline');
-    if (!changes && weather && current.air && current.air.level >= 4 && weatherTags(weather).some(t => ['haze', 'dust'].includes(t))) tags.push('polluted');
+    if (!changes && weather && current.air && highAirRisk(current.air) && weatherTags(weather).some(t => ['haze', 'dust'].includes(t))) tags.push('polluted');
     if (weather && (weather.windScale ?? 0) >= 5 && changes?.some(c => c.id === 'windUp')) tags.push('strongWind');
-    if (weather && weatherTags(weather).includes('fog') && (!current.air || current.air.level < 4)) tags.push('waterFog');
-    if (this.previous?.weather && weatherTags(this.previous.weather).includes('fog') && (!this.previous.air || this.previous.air.level < 4) && weather && ![500, 501, 509, 510, 514, 515].includes(Number(weather.conditionCode))) tags.push('wasWaterFog');
+    if (weather && weatherTags(weather).includes('fog') && (!current.air || lowerAirRisk(current.air))) tags.push('waterFog');
+    if (this.previous?.weather && weatherTags(this.previous.weather).includes('fog') && (!this.previous.air || lowerAirRisk(this.previous.air)) && weather && ![500, 501, 509, 510, 514, 515].includes(Number(weather.conditionCode))) tags.push('wasWaterFog');
     if (weather?.visibilityKm !== undefined && this.previous?.weather?.visibilityKm !== undefined && weather.visibilityKm < this.previous.weather.visibilityKm) tags.push('visibilityFell');
     if (weather?.windScale !== undefined && weather.windScale >= 3 && weather.windScale < 5) tags.push('moderateWind');
     if (current.air && !current.errors.air) {
       if (goodAir(current.air)) tags.push('goodAir');
-      if (['轻度污染', '中度污染', '重度污染', '严重污染', 'Unhealthy for Sensitive Groups', 'Unhealthy', 'Very Unhealthy', 'Hazardous'].includes(current.air.category)) tags.push('pollutedAir');
+      if (pollutedAir(current.air)) tags.push('pollutedAir');
       if (!tags.includes('clearerAir')) tags.push('airWithoutClearerView');
-      if (current.air.level < 4) tags.push('notSeverelyPolluted');
+      if (lowerAirRisk(current.air)) tags.push('notSeverelyPolluted');
     } else if (!current.air) tags.push('notSeverelyPolluted');
     if (weather?.visibilityKm !== undefined && this.previous?.weather?.visibilityKm !== undefined && weather.visibilityKm >= this.previous.weather.visibilityKm) tags.push('visibilityNotFallen');
     if (weather && weather.condition !== '未知') tags.push([500, 501, 509, 510, 514, 515].includes(Number(weather.conditionCode)) ? 'fogPresent' : 'noFog');
@@ -167,7 +168,7 @@ export class RealtimeWeatherWorld implements World {
       changes.push(...alertChanges(this.previous?.alerts ?? [], current.alerts, this.now(), this.timezone()));
     }
     const receipt = changes.length ? this.currentReceipt(current, 'passive', changes) : '';
-    if (current.air && !current.errors.air && !current.errors.weather && (this.airVisibilityBaseline === undefined || !(this.previous?.air && goodAir(this.previous.air)) && goodAir(current.air) || (this.previous?.air && current.air.level > this.previous.air.level))) {
+    if (current.air && !current.errors.air && !current.errors.weather && (this.airVisibilityBaseline === undefined || this.previous?.air?.standard !== current.air.standard || !(this.previous?.air && goodAir(this.previous.air)) && goodAir(current.air) || (this.previous?.air && current.air.level > this.previous.air.level))) {
       this.airVisibilityBaseline = current.weather?.visibilityKm;
       this.airHazeBaseline = !!current.weather && weatherTags(current.weather).includes('haze');
     }

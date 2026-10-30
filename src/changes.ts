@@ -29,7 +29,8 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
   }
   const oldType = before.precipitationType ?? 'unknown', newType = current.precipitationType ?? 'unknown';
   if (oldType !== newType) {
-    if (oldType === 'none' && newType === 'mixed') add('mixedStarted', '开始下雨夹雪');
+    if (newType === 'none' && (oldType === 'ice' || before.conditionCode === '313')) add('precipitationStopped', '特殊降水停止');
+    else if (oldType === 'none' && newType === 'mixed') add('mixedStarted', '开始下雨夹雪');
     else if (oldType === 'mixed' && newType === 'none') add('mixedStopped', '雨夹雪停止');
     else if (oldType === 'snow' && newType === 'mixed') add('snowToMixed', '雪转雨夹雪');
     else if (oldType === 'mixed' && newType === 'snow') add('mixedToSnow', '雨夹雪转雪');
@@ -37,7 +38,7 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     else if (['snow', 'mixed'].includes(oldType) && newType === 'rain') add('snowToRain', '雪转雨');
     else if (newType === 'rain' || newType === 'snow') add(newType === 'rain' ? 'rainStarted' : 'snowStarted', `${newType === 'rain' ? '开始下雨' : '开始下雪'}`);
     else if (newType === 'none' && (oldType === 'rain' || oldType === 'snow')) add(oldType === 'rain' ? 'rainStopped' : 'snowStopped', oldType === 'rain' ? '雨停了' : '雪停了');
-    else if (newType === 'none') add('precipitationStopped', '当前无降水');
+    else if (newType === 'none') add('precipitationUpdated', '当前无降水');
     else add('precipitationChanged', '降水类型改变');
   } else if (['rain', 'snow'].includes(newType)) {
     // Only compare known intensity classes; shower/type codes do not imply a strength.
