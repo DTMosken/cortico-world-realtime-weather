@@ -302,7 +302,9 @@ export class RealtimeWeatherWorld implements World {
         }
         if (method === 'searchCities') {
           if (typeof args[0] !== 'string' || !args[0].trim()) throw new Error('请输入城市或区划名称');
-          this.candidates = await this.client.cities(args[0]); return this.candidates;
+          if (args[1] !== undefined && typeof args[1] !== 'string') throw new Error('上级行政区须为文本');
+          if (args[2] !== undefined && typeof args[2] !== 'string') throw new Error('国家或地区代码须为文本');
+          this.candidates = await this.client.cities(args[0], { adm: args[1] as string | undefined, range: args[2] as string | undefined }); return this.candidates;
         }
         if (method === 'selectCity') {
           const selected = this.candidates.find(c => c.id === args[0]);

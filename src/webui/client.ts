@@ -16,6 +16,8 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
   let state = await ctx.invoke<State>('state');
   let candidates: Location[] = [];
   let search = '';
+  let adm = '';
+  let range = '';
   let message = '';
   let failed = false;
   let searching = false;
@@ -81,7 +83,18 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
     sheet.body.append(buttons);
     const help = ui.foldSheet('qweather-registration', { title: '如何取得密钥', defaultOpen: false });
     const registration = ui.h('a', null, '注册QWeather账号'); registration.href = 'https://id.qweather.com/'; registration.target = '_blank'; registration.rel = 'noopener noreferrer';
-    help.body.append(registration, ui.h('p', null, '创建项目并添加 API KEY 凭据。在控制台「设置」复制专属 API Host，填入上方；打开密钥文件，将 API Key 填入 CORTICO_QWEATHER_API_KEY 后保存。选择地点后即可测试连接。'));
+    help.body.append(registration);
+    const steps = ui.h('ol');
+    steps.style.cssText = 'padding-left:24px;line-height:1.8';
+    for (const text of [
+      '注册并登录后，点击进入「开发服务控制台」。',
+      '按提示绑定邮箱和手机号。',
+      '进入「项目管理」，创建项目；在项目中添加凭据，认证方式选择「API KEY」。',
+      '复制 API KEY 的完整值。点击上方「打开密钥文件」，填在 CORTICO_QWEATHER_API_KEY= 后面，不加引号，保存文件。',
+      '进入开发服务控制台的「设置」，找到并复制 API Host，填入上方的「QWeather API Host」。只填主机名，不加 https://。',
+      '搜索并选择城市或区划，然后点击「测试连接」。',
+    ]) steps.append(ui.h('li', null, text));
+    help.body.append(steps, ui.h('p', null, '新建凭据后，如果本扩展和官方 Playground 都返回 401，可等待一段时间后重试。401 表示认证未通过，仅凭该状态无法确定是否为凭据尚未生效；持续失败时请联系 QWeather 支持。'));
     sheet.body.append(help.el);
 
     const location = state.config.location;
@@ -90,7 +103,7 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
       if (!ready || searching || !search.trim()) return;
       searching = true; candidates = []; searchMessage = '搜索中…'; searchFailed = false; render();
       try {
-        candidates = await ctx.invoke<Location[]>('searchCities', [search.trim()]);
+        candidates = await ctx.invoke<Location[]>('searchCities', [search.trim(), adm.trim(), range.trim()]);
         searchMessage = candidates.length ? `找到 ${candidates.length} 个地点` : '没有匹配的城市或区划，试试城市名或拼音';
       } catch (error) {
         searchMessage = error instanceof Error ? error.message : '搜索失败'; searchFailed = true;
@@ -98,13 +111,20 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
     }
     const searchButton = ui.button(searching ? '搜索中…' : '搜索', { variant: 'primary', onClick: () => { void searchCities(); } });
     searchButton.disabled = !ready || searching || !search.trim();
-    const input = ui.input({ type: 'search', value: search, placeholder: '城市或区划名称，如济南', disabled: !ready || searching,
+    const input = ui.input({ type: 'search', value: search, placeholder: '城市或区划名称', disabled: !ready || searching,
       onInput: value => { search = value; searchButton.disabled = !ready || searching || !value.trim(); },
       onCommit: () => { void searchCities(); } });
     input.setAttribute('aria-label', '搜索城市或区划');
     input.style.cssText = 'flex:1;min-width:160px';
     const searchRow = ui.rowbar();
     searchRow.append(input, searchButton);
+    const filters = ui.h('div');
+    filters.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px';
+    filters.append(
+      ui.field('上级行政区（可选）', ui.input({ value: adm, placeholder: '省、州或所属城市', disabled: !ready || searching, onInput: value => { adm = value; }, onCommit: () => { void searchCities(); } })),
+      ui.field('国家或地区代码（可选）', ui.input({ value: range, placeholder: 'ISO 国家代码，如 cn、au', disabled: !ready || searching, onInput: value => { range = value; }, onCommit: () => { void searchCities(); } })),
+    );
+    locationSheet.body.append(filters);
     locationSheet.body.append(searchRow, ui.msgline(!ready ? '请先填写 API Host 并保存密钥，再搜索地点。' : searchMessage, searchFailed));
     for (const city of candidates) {
       const row = ui.rowbar();

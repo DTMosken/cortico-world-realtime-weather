@@ -134,8 +134,11 @@ export class QWeather {
     this.rawAlerts = result.alerts;
     return result.alerts.map(normalizeAlert);
   }
-  async cities(query: string, signal?: AbortSignal): Promise<Location[]> {
-    const result = await this.get<{ code: string; location?: { id: string; name: string; country: string; adm1: string; adm2: string; lat: string; lon: string; tz: string }[] }>(`/geo/v2/city/lookup?location=${encodeURIComponent(query)}&number=20&lang=zh`, signal);
+  async cities(query: string, filters: { adm?: string; range?: string } = {}, signal?: AbortSignal): Promise<Location[]> {
+    const params = new URLSearchParams({ location: query, number: '20', lang: 'zh' });
+    if (filters.adm?.trim()) params.set('adm', filters.adm.trim());
+    if (filters.range?.trim()) params.set('range', filters.range.trim().toLowerCase());
+    const result = await this.get<{ code: string; location?: { id: string; name: string; country: string; adm1: string; adm2: string; lat: string; lon: string; tz: string }[] }>(`/geo/v2/city/lookup?${params}`, signal);
     if (result.code !== '200') throw new Error(`城市搜索：${/^\d{3}$/.test(result.code) ? result.code : '响应错误'}`);
     return (result.location ?? []).map(l => ({ id: l.id, name: l.name, country: l.country, province: l.adm1, city: l.adm2, latitude: Number(l.lat), longitude: Number(l.lon), timezone: l.tz }));
   }
