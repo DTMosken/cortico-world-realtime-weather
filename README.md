@@ -22,7 +22,7 @@ Cortico World扩展，使用QWeather获取天气、空气质量、官方预警�
 
 温度/体感变化默认3°C，风力变化2级，能见度跨越1 km，UV与空气质量跨等级时双向提醒。降水类型、雨雪强度、晴阴转换和预警生命周期变化也会触发。预报降水概率变化阈值为30个百分点。阈值在配置页修改，下次轮询使用新值。
 
-逐小时温度预报的同一有效时刻修订达到2°C也提醒；配置温差小于2°C时采用配置值。体感、实况和逐日温差仍采用原配置。一两度上调句只匹配不超过2°C的修订，轻微下调句匹配不超过3°C的修订。
+逐小时与逐日预报都按配置的温差阈值提醒；不单独提醒预测温度微调。
 
 实况时间表示查询时间；预报行时间是预报有效时刻。失败时保留最近成功数据并标明沿用时间，主动工具可立即重试。内部使用UTC，展示采用所选地点时区。缺失字段不当作零。
 
@@ -62,7 +62,6 @@ JSON契约见`src/ambience.schema.json`。`rules`中的`part`为`opening`（起�
 - 一般天气变化：`cloudIncreased`、`cloudDecreased`、`thunderStarted`、`thunderStopped`、`thunderToRain`、`hazeStarted`、`hazeCleared`、`dustStarted`、`dustCleared`。霾/沙尘消退句只用于转为晴或云天气。
 - 空气与风：`moderateWind`（3–4级）、`goodAir`、`pollutedAir`、`airWithoutClearerView`。空气优良/污染采用对应AQI的类别，不把所有国家的100当成同一界线。
 - 近期预报：`forecastWindUp/Down`、`forecastVisibilityUp/Down`、`forecastUvUp/Down`、`forecastRainWeaker`、`forecastRainStopped`、`forecastSnowStarted`、`forecastSnowStronger`、`forecastSnowWeaker`、`forecastSnowStopped`。根据实况至未来第1、第2小时的顺序比较；被动提醒还要求相应预报时段的对应字段发生修订。UV增强句要求未来UV≥7；雨/雪减弱及停止句要求当前正在下对应降水。含“待会儿”的句子不用于远日预报。
-- 修订：`forecastTemperatureRevisedUp/Down`只描述同一未来时刻的预报温度修订，不当作当前至未来的升降温。
 - 逐日：`forecastDailyWarm`要求未来至少连续三天最低温、最高温均逐日上涨，累计达到温差阈值；`forecastDailyWarmFromTomorrow`还要求这段从明天开始且明天高于今天的逐日极值。
 
 `unsupportedNowcast`仍对应未接入的分钟级雨停句。本扩展不新增分钟级接口；本轮雨停预报使用现有逐时数据。

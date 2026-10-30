@@ -93,6 +93,7 @@ export class RealtimeWeatherWorld implements World {
       if (current.air.level < 4) tags.push('notSeverelyPolluted');
     } else if (!current.air) tags.push('notSeverelyPolluted');
     if (weather?.visibilityKm !== undefined && this.previous?.weather?.visibilityKm !== undefined && weather.visibilityKm >= this.previous.weather.visibilityKm) tags.push('visibilityNotFallen');
+    if (weather && weather.condition !== '未知') tags.push([500, 501, 509, 510, 514, 515].includes(Number(weather.conditionCode)) ? 'fogPresent' : 'noFog');
     const alertTypes = Object.fromEntries((changes ?? []).filter(c => c.alertType).map(c => [c.id, [...new Set(changes!.filter(other => other.id === c.id).map(other => other.alertType))].join('、')]));
     const atmosphere = this.ambience.render('current', trigger, current.at, this.timezone(), tags, alertTypes);
     const data = changes ? `${clock(current.at, this.timezone())}｜${changes.map(c => c.text).join('｜')}` : currentLine(current, this.timezone());
@@ -178,7 +179,7 @@ export class RealtimeWeatherWorld implements World {
       const old = this.previousForecast?.hours.find(h => h.at === hour.at);
       if (current.errors.hours) { next.hours.push(old ?? hour); continue; }
       if (old) {
-        const result = weatherChanges(old, hour, this.ctx.cfg, Math.min(2, this.ctx.cfg.temperatureChange));
+        const result = weatherChanges(old, hour, this.ctx.cfg);
         if (result.changes.length && visibleHours.has(hour.at)) {
           changes.push({ id: 'hourChanged', text: `${clock(hour.at, this.timezone())}｜${result.changes.map(c => c.text).join('｜')}` });
           selection.hours.set(hour.at, result.changes);

@@ -39,13 +39,6 @@ describe('预报文案范围', () => {
     const unrelated = forecastTags(f, { ...clear, windScale: 8 }, REALTIME_WEATHER_DEFAULTS, 'UTC', { hours: new Map([[f.hours[0].at, [{ id: 'uvUp', text: '' }]]]), days: new Map() });
     expect(unrelated).not.toContain('forecastWindDown');
   });
-  it('只修订预报温度不等于明显升温，3°C上调不套一两度原句', () => {
-    const f = snapshot({ days: [] });
-    const selection = { hours: new Map([[f.hours[0].at, [{ id: 'temperatureUp', text: '', delta: 2 }]]]), days: new Map() };
-    expect(forecastTags(f, clear, REALTIME_WEATHER_DEFAULTS, 'UTC', selection)).toContain('forecastTemperatureRevisedUp');
-    selection.hours.get(f.hours[0].at)![0].delta = 3;
-    expect(forecastTags(f, clear, REALTIME_WEATHER_DEFAULTS, 'UTC', selection)).not.toContain('forecastTemperatureRevisedUp');
-  });
   it('连续晴天只看未来多日，夜间多云不否定晴天；多日失败不由逐时推断', () => {
     expect(tags(snapshot())).toContain('forecastClear');
     expect(tags(snapshot({ days: [], errors: { days: '不可用' } }))).not.toContain('forecastClear');

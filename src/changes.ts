@@ -8,10 +8,10 @@ export function precipitationRank(w: Weather): number | undefined {
 }
 
 /** 数字基线只在对应阈值触发时前移；其他字段保持最近成功状态。 */
-export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeWeatherConfigSection, temperatureThreshold = cfg.temperatureChange): { changes: Change[]; baseline: Weather } {
+export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeWeatherConfigSection): { changes: Change[]; baseline: Weather } {
   const changes: Change[] = [];
   const baseline: Weather = { ...current };
-  const add = (id: string, text: string, delta?: number) => changes.push({ id, text, ...(delta === undefined ? {} : { delta }) });
+  const add = (id: string, text: string) => changes.push({ id, text });
   const oldTags = weatherTags(before), newTags = weatherTags(current);
   if (conditionCode(before.conditionCode) !== conditionCode(current.conditionCode)) {
     const cloudRank: Record<string, number> = { '102': 1, '103': 1, '101': 2, '104': 3 };
@@ -53,7 +53,7 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     }
   }
   for (const [key, threshold, unit, label, up, down] of [
-    ['temperature', temperatureThreshold, '°C', '温度', 'temperatureUp', 'temperatureDown'],
+    ['temperature', cfg.temperatureChange, '°C', '温度', 'temperatureUp', 'temperatureDown'],
     ['feelsLike', cfg.temperatureChange, '°C', '体感', 'feelsLikeUp', 'feelsLikeDown'],
     ['windScale', cfg.windScaleChange, '级', '风力', 'windUp', 'windDown'],
     ['precipitationProbability', cfg.precipitationProbabilityChange / 100, '', '降水概率', 'probabilityUp', 'probabilityDown'],
@@ -63,7 +63,7 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     const delta = key === 'precipitationProbability' ? Math.abs(Math.round(value * 100) - Math.round(previous * 100)) / 100 : Math.abs(value - previous);
     if (delta >= threshold) {
       const display = (n: number) => key === 'precipitationProbability' ? `${Math.round(n * 100)}%` : `${Math.round(n * 10) / 10}${unit}`;
-      add(value > previous ? up : down, `${label}${display(previous)}→${display(value)}`, value - previous);
+      add(value > previous ? up : down, `${label}${display(previous)}→${display(value)}`);
     } else baseline[key] = previous;
   }
   if (before.visibilityKm !== undefined && current.visibilityKm !== undefined && (before.visibilityKm < cfg.visibilityThresholdKm) !== (current.visibilityKm < cfg.visibilityThresholdKm)) add(current.visibilityKm < cfg.visibilityThresholdKm ? 'visibilityDown' : 'visibilityUp', `能见度${before.visibilityKm}→${current.visibilityKm} km`);

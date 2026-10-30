@@ -22,18 +22,21 @@ describe('实况与预报合并', () => {
     await fixture.world.start(fixture.host);
     fixture.current = weather({ condition: { code: '501' }, visibility: { value: 1500 } });
     await fixture.world.pollCurrent();
-    expect(fixture.events[0].text).toContain('外面的视线比刚才好多了');
+    expect(fixture.events[0].text).toContain('虽然窗外的雾气还没完全散去');
+    expect(fixture.events[0].text).not.toContain('明明没有起雾');
     expect(fixture.events[0].text).not.toContain('浓雾终于散开');
   });
-  it('同一逐时时刻修订2°C输出微调句，实况仍遵守原温差阈值', async () => {
-    fixture = await service(); fixture.current = weather({ temperature: { value: 24 } });
-    await fixture.world.start(fixture.host);
-    fixture.hours[0].temperature.value = 24;
+  it('同一逐时预报的小温差不提醒，累积达到配置阈值才提醒', async () => {
+    fixture = await service(); await fixture.world.start(fixture.host);
+    const original = fixture.hours[0].temperature.value;
+    const threshold = fixture.cfg.temperatureChange;
+    fixture.hours[0].temperature.value = original + threshold - 1;
+    await fixture.world.pollForecast(); expect(fixture.events).toEqual([]);
+    fixture.hours[0].temperature.value = original + threshold;
     await fixture.world.pollForecast();
-    expect(fixture.events[0].text).toContain('22°C→24°C');
-    expect(fixture.events[0].text).toContain('调高了一两度');
-    fixture.events.length = 0; fixture.current = weather({ temperature: { value: 26 } });
-    await fixture.world.pollCurrent(); expect(fixture.events).toEqual([]);
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).toContain(`温度${original}°C→${original + threshold}°C`);
+    expect(fixture.events[0].text).not.toContain('一两度');
   });
   it('初始化建立基线；每四轮空气质量更新一次，天气和预警每轮查询', async () => {
     fixture = await service();
@@ -101,7 +104,8 @@ describe('实况与预报合并', () => {
   it('非雾能见度变化使用不推断原因的通用句', async () => {
     fixture = await service(); await fixture.world.start(fixture.host);
     fixture.current = weather({ visibility: { value: 500 } }); await fixture.world.pollCurrent();
-    expect(fixture.events).toHaveLength(1); expect(fixture.events[0].text).toContain('能见度'); expect(fixture.events[0].text).toContain('稍远一点的建筑和街景');
+    expect(fixture.events).toHaveLength(1); expect(fixture.events[0].text).toContain('能见度'); expect(fixture.events[0].text).toContain('明明没有起雾，但稍远一点的楼房和街景');
+    expect(fixture.events[0].text).not.toContain('雾气还没完全散去');
   });
   it('起雾及雾散用新增文案，温度事件不带未变化的污染文案', async () => {
     fixture = await service(); await fixture.world.start(fixture.host);

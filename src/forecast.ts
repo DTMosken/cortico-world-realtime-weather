@@ -31,10 +31,6 @@ export function forecastTags(forecast: Forecast, current: Weather | undefined, c
       if (hour.temperature <= current.temperature - threshold && (!ids || ids.includes('temperatureDown'))) tags.add('forecastCold');
       if (hour.temperature >= current.temperature + threshold && (!ids || ids.includes('temperatureUp'))) tags.add('forecastWarm');
     }
-    for (const change of changes ?? []) {
-      if (change.delta !== undefined && change.id === 'temperatureUp' && change.delta <= 2 && !tags.has('forecastWarm')) tags.add('forecastTemperatureRevisedUp');
-      if (change.delta !== undefined && change.id === 'temperatureDown' && change.delta >= -3 && !tags.has('forecastCold')) tags.add('forecastTemperatureRevisedDown');
-    }
     const previous = index === 0 ? current : visible[index - 1];
     if (!previous) continue;
     const trend = weatherChanges(previous, hour, cfg).changes.map(c => c.id);

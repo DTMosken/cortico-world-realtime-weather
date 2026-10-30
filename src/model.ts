@@ -62,7 +62,7 @@ export interface Forecast {
   daysAt?: string;
   errors: Partial<Record<'hours' | 'days', string>>;
 }
-export interface Change { id: string; text: string; alertType?: string; delta?: number }
+export interface Change { id: string; text: string; alertType?: string }
 
 export function uvLevel(value: number): number {
   return value < 3 ? 0 : value < 6 ? 1 : value < 8 ? 2 : value < 11 ? 3 : 4;
