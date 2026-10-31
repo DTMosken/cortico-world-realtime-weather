@@ -44,6 +44,8 @@ JSON契约见`src/ambience.schema.json`。`rules`中的`part`为`opening`（起�
 
 预警类型用`{alertType}`占位，填入该条文案对应的预警变化类型；同类变化涉及多个类型时用顿号连接。类型来自归一化名称，未映射类型为“气象”，不读取预警原文。
 
+夜间厚云句要求当前为多云或阴（`thickCloud`）；夜间云量减少使用独立句，白昼才使用“亮堂”句。日落燥热句要求当前高温（`hot`）。
+
 可用于补充词库的标签：
 
 - 查询：`current`、`forecast`、`active`、`passive`。

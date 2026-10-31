@@ -751,7 +751,8 @@
       "id": "sunset-2",
       "part": "complete",
       "when": [
-        "sunset"
+        "sunset",
+        "hot"
       ],
       "texts": [
         "太阳落山了，白天的燥热正在散去，看了一眼窗外渐暗的天色，起身打开了屋里的灯。"
@@ -1105,7 +1106,8 @@
       "when": [
         "current",
         "becameCloudy",
-        "dark"
+        "dark",
+        "thickCloud"
       ],
       "texts": [
         "窗外原本还能看见的几颗星星和月光被厚云层彻底遮住了，夜色变得更加深沉暗淡。"
@@ -1370,7 +1372,8 @@
       "part": "body",
       "when": [
         "current",
-        "cloudDecreased"
+        "cloudDecreased",
+        "daylight"
       ],
       "texts": [
         "厚重的云层裂开了一些缝隙，虽然还没彻底放晴，但天色比刚才亮堂了不少。"
@@ -1690,6 +1693,19 @@
       "texts": [
         "外面噼里啪啦的动静总算消停了，窗沿上只留下一道道湿冷的痕迹。",
         "敲打着窗户的声响终于停了下来，外面恢复了安静，只是地面看着还有些湿滑。"
+      ],
+      "priority": 50
+    },
+    {
+      "id": "cloudDecreased-dark",
+      "part": "body",
+      "when": [
+        "current",
+        "cloudDecreased",
+        "dark"
+      ],
+      "texts": [
+        "窗外的云层变薄了不少，隐约能从云隙间透出一点微弱的夜空光亮。"
       ],
       "priority": 50
     }

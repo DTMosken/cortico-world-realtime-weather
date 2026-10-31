@@ -8,6 +8,25 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it.each([
+    ['100', '152', false], ['104', '153', false], ['100', '151', true], ['100', '104', true],
+  ])('夜间%s到%s按云量选择厚云或通用文案', async (before, after, thick) => {
+    fixture = await service();
+    Object.assign(fixture.cfg.location!, { latitude: -34, longitude: 151 });
+    fixture.now = Date.parse('2026-10-31T12:00:00Z');
+    fixture.current = weather({ condition: { code: before } });
+    await fixture.start(); fixture.events.length = 0;
+    fixture.current = weather({ condition: { code: after } });
+    await fixture.world.pollCurrent();
+    const text = fixture.events[0].text!;
+    if (thick) expect(text).toContain('厚云层彻底遮住');
+    else {
+      expect(text).toContain(before === '104' ? '窗外的云层变薄了不少，隐约能从云隙间透出一点微弱的夜空光亮。' : '天气状况不知不觉发生了一点变化');
+      expect(text).not.toContain('厚云层彻底遮住');
+      expect(text).not.toContain('亮堂了不少');
+    }
+  });
+
   it('延迟投递启动摘要时采用最新轮询数据和文案，只投递一次', async () => {
     fixture = await service('Australia/Sydney', true);
     await fixture.start();

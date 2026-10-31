@@ -14,6 +14,17 @@ function create() {
   return { file, copy: new Ambience(file, () => 0) };
 }
 describe('demo文案与部署覆盖', () => {
+  it('日落燥热句只匹配高温，云量减少亮堂句只匹配白昼', () => {
+    const { copy } = create();
+    const at = '2026-10-31T08:00:00Z';
+    const cool = weatherTags({ conditionCode: '104', condition: '阴', temperature: 20 });
+    expect(copy.render('sunset', 'passive', at, 'UTC', [...cool, 'cloudyOrWet'])).not.toContain('燥热');
+    const hot = weatherTags({ conditionCode: '104', condition: '阴', temperature: 33 });
+    expect(copy.render('sunset', 'passive', at, 'UTC', hot)).toContain('燥热');
+    expect(copy.render('current', 'passive', at, 'UTC', ['cloudDecreased', 'daylight'])).toContain('亮堂了不少');
+    expect(copy.render('current', 'passive', at, 'UTC', ['cloudDecreased', 'dark'])).not.toContain('亮堂了不少');
+  });
+
   it('夏季日落前的17点不使用暮色起手', () => {
     const { copy } = create();
     const location = { name: 'Example', country: '', province: '', city: '', latitude: -34, longitude: 151, timezone: 'Australia/Sydney' };

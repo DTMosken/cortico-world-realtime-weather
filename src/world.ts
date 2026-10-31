@@ -86,6 +86,9 @@ export class RealtimeWeatherWorld implements World {
   private currentReceipt(current: Current, trigger: 'active' | 'passive', changes?: Change[]): string {
     const weather = current.errors.weather ? undefined : current.weather;
     const tags = changes ? ['current', ...changes.map(c => c.id), ...this.tags(weather).filter(t => ['daylight', 'dark', 'calm', 'cloudyOrWet'].includes(t))] : ['current', ...this.tags(weather)];
+    const thickCloud = weather && ['101', '104', '151', '154'].includes(weather.conditionCode);
+    if (thickCloud) tags.push('thickCloud');
+    if (changes?.some(c => c.id === 'becameCloudy') && !thickCloud && tags.includes('dark')) tags.push('conditionChanged');
     if (weather?.uv !== undefined) { if (weather.uv >= 7) tags.push('highUv'); if (weather.uv <= 2) tags.push('lowUv'); }
     if (current.air && goodAir(current.air) && weather?.visibilityKm !== undefined && this.airVisibilityBaseline !== undefined && weather.visibilityKm > this.airVisibilityBaseline) tags.push('clearerAir');
     if (weather && weatherTags(weather).some(tag => ['clear', 'cloudy'].includes(tag))) tags.push('clearAirWeather');
