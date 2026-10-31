@@ -334,7 +334,12 @@ export class RealtimeWeatherWorld implements World {
     if (this.host !== host || this.controller.signal.aborted) return;
     await Promise.all([this.pollCurrent(false), this.pollForecast('silent')]);
     if (this.host !== host || this.controller.signal.aborted) return;
-    await this.push('realtime-weather.summary', [this.currentReceipt(this.current!, 'passive'), this.forecastReceipt(this.forecast!, 'passive')].join('\n\n'));
+    const summary = [this.currentReceipt(this.current!, 'passive'), this.forecastReceipt(this.forecast!, 'passive')].join('\n\n');
+    // Temporary workaround: startup replay can requeue an already queued persisted event.
+    host.pushDeferred({
+      type: 'realtime-weather.summary', senderKey: this.id, origin: 'external',
+      render: () => this.host === host ? summary : null,
+    });
     this.schedule(() => this.pollCurrent(), REALTIME_WEATHER_CURRENT_INTERVAL_MS);
     this.schedule(() => this.pollForecast(), REALTIME_WEATHER_FORECAST_INTERVAL_MS);
     this.scheduleSolar();

@@ -10,7 +10,7 @@ import { RealtimeWeatherWorld } from '../../src/world.ts';
 export function weather(overrides: Record<string, unknown> = {}) {
   return { condition: { code: '104', text: 'PRIVATE_LOCATION' }, temperature: { value: 22, unit: '°C' }, feelsLike: { value: 24 }, wind: { direction: { compass: 'e' }, scale: 3 }, precipitation: { type: 'none', intensity: { value: 0 }, probability: 0.1, amount: { value: 0 } }, visibility: { value: 8000 }, uvIndex: 2, ...overrides };
 }
-export async function service(timezone = 'Australia/Sydney') {
+export async function service(timezone = 'Australia/Sydney', deferEvents = false) {
   let now = Date.parse('2026-10-31T06:15:00Z');
   let current = weather();
   let hours = [1, 2, 3].map(offset => ({ ...weather(), forecastTime: new Date(now + offset * 3600000).toISOString() }));
@@ -43,9 +43,24 @@ export async function service(timezone = 'Australia/Sydney') {
   let restarts = 0;
   const context: WorldContext<RealtimeWeatherConfigSection> = { id: 'realtime-weather', cfg, timezone, botName: 'example', botDir, dataDir: botDir, repoRoot: botDir, packageDir: botDir, secret: () => 'PRIVATE_KEY', storeSecret: () => {}, persist: patch => { Object.assign(cfg, patch); }, restart: async () => { restarts++; } };
   const events: EventEnvelope[] = [];
-  const host = { pushEvent: async (e: EventEnvelope) => { events.push(e); return e; }, log: { warn: () => {} } } as unknown as WorldHost;
+  const deferred: Parameters<WorldHost['pushDeferred']>[0][] = [];
+  const materialize = async (spec: Parameters<WorldHost['pushDeferred']>[0]) => {
+    const rendered = await spec.render();
+    if (rendered === null) return;
+    events.push({ type: spec.type, source: 'realtime-weather', senderKey: spec.senderKey,
+      origin: spec.origin ?? 'external', ts: new Date(now).toISOString(), cursor: events.length + 1,
+      text: typeof rendered === 'string' ? rendered : rendered.text });
+  };
+  const host = {
+    pushEvent: async (e: EventEnvelope) => { events.push(e); return e; },
+    pushDeferred: (spec: Parameters<WorldHost['pushDeferred']>[0]) => {
+      if (deferEvents) deferred.push(spec); else void materialize(spec);
+    },
+    log: { warn: () => {} },
+  } as unknown as WorldHost;
   const world = new RealtimeWeatherWorld(context, { request, now: () => now, openFile: async () => {}, random: () => 0 });
   return { world, host, events, cfg, context, request, counts, errors, holds, headerKeys, botDir,
+    async flushDeferred() { for (const spec of deferred.splice(0)) await materialize(spec); },
     get now() { return now; }, set now(value: number) { now = value; },
     get current() { return current; }, set current(value) { current = value; },
     get hours() { return hours; }, set hours(value) { hours = value; },

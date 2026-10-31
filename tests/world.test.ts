@@ -6,6 +6,29 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('启动摘要在投递前不落库，补投扫描不可见，投递时仅产生一条', async () => {
+    fixture = await service('Australia/Sydney', true);
+    await fixture.world.start(fixture.host);
+    expect(fixture.events).toEqual([]);
+    await fixture.flushDeferred();
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].type).toBe('realtime-weather.summary');
+    expect(fixture.events[0].origin).toBe('external');
+    expect(fixture.events[0].text).toContain('AQI(CN)');
+    expect(fixture.events[0].text).toContain('无有效预警');
+    expect(fixture.events[0].text).toContain('18:15');
+    expect(fixture.events[0].text).toContain('11/01');
+    await fixture.flushDeferred();
+    expect(fixture.events).toHaveLength(1);
+  });
+  it('停止后未投递的启动摘要不再发送', async () => {
+    fixture = await service('Australia/Sydney', true);
+    await fixture.world.start(fixture.host);
+    await fixture.world.stop();
+    await fixture.flushDeferred();
+    expect(fixture.events).toEqual([]);
+  });
+
   it('普通逐日通知刷新已展示风力范围及最高降水概率', async () => {
     fixture = await service();
     await fixture.world.start(fixture.host); fixture.events.length = 0;
