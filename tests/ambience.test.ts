@@ -14,6 +14,14 @@ function create() {
   return { file, copy: new Ambience(file, () => 0) };
 }
 describe('demo文案与部署覆盖', () => {
+  it('夏季日落前的17点不使用暮色起手', () => {
+    const { copy } = create();
+    const location = { name: 'Example', country: '', province: '', city: '', latitude: -34, longitude: 151, timezone: 'Australia/Sydney' };
+    const text = copy.render('current', 'passive', '2026-10-31T06:00:00Z', location.timezone, ['rainStarted'], {}, location);
+    expect(text).not.toContain('暮色');
+    expect(text).toContain('余光瞥见屋里的光线变了');
+  });
+
   it('大雨缺失强度不套小雨句，高UV低温不套热浪句', () => {
     const { copy } = create();
     const rain = weatherTags({ conditionCode: '307', condition: '大雨', precipitationType: 'rain' });

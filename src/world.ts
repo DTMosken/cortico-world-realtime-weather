@@ -105,13 +105,13 @@ export class RealtimeWeatherWorld implements World {
     if (weather?.visibilityKm !== undefined && this.previous?.weather?.visibilityKm !== undefined && weather.visibilityKm >= this.previous.weather.visibilityKm) tags.push('visibilityNotFallen');
     if (weather && weather.condition !== '未知') tags.push([500, 501, 509, 510, 514, 515].includes(Number(weather.conditionCode)) ? 'fogPresent' : 'noFog');
     const alertTypes = Object.fromEntries((changes ?? []).filter(c => c.alertType).map(c => [c.id, [...new Set(changes!.filter(other => other.id === c.id).map(other => other.alertType))].join('、')]));
-    const atmosphere = this.ambience.render('current', trigger, current.at, this.timezone(), tags, alertTypes);
+    const atmosphere = this.ambience.render('current', trigger, current.at, this.timezone(), tags, alertTypes, this.ctx.cfg.location ?? undefined);
     const data = changes ? `${clock(current.at, this.timezone())}｜${changes.map(c => c.text).join('｜')}` : currentLine(current, this.timezone());
     return [data, atmosphere].filter(Boolean).join('\n\n');
   }
   private forecastReceipt(forecast: Forecast, trigger: 'active' | 'passive', changes?: Change[], selection?: ForecastSelection): string {
     const tags = forecastTags(forecast, this.current?.errors.weather ? undefined : this.current?.weather, this.ctx.cfg, this.timezone(), selection);
-    const atmosphere = this.ambience.render('forecast', trigger, forecast.at, this.timezone(), tags);
+    const atmosphere = this.ambience.render('forecast', trigger, forecast.at, this.timezone(), tags, {}, this.ctx.cfg.location ?? undefined);
     const data = changes ? `${clock(forecast.at, this.timezone())}\n${changes.map(c => c.text).join('\n')}` : forecastLines(forecast, this.timezone());
     return [data, atmosphere].filter(Boolean).join('\n\n');
   }
@@ -313,7 +313,7 @@ export class RealtimeWeatherWorld implements World {
       const run = async () => {
         if (next) {
           const at = new Date(this.now()).toISOString();
-          const atmosphere = this.ambience.render(next.kind, 'passive', at, this.timezone(), this.tags(this.current?.weather));
+          const atmosphere = this.ambience.render(next.kind, 'passive', at, this.timezone(), this.tags(this.current?.weather), {}, this.ctx.cfg.location ?? undefined);
           const current = this.current;
           const stale = current?.errors.weather && current.weatherAt ? `（沿用${clock(current.weatherAt, this.timezone())}）` : '';
           await this.push('realtime-weather.solar', [`${clock(at, this.timezone())}｜${next.kind === 'sunrise' ? '日出' : '日落'}${current?.weather ? `｜${current.weather.condition}${stale}` : ''}`, atmosphere].filter(Boolean).join('\n\n'));
@@ -327,11 +327,10 @@ export class RealtimeWeatherWorld implements World {
   private async initialize(host: WorldHost): Promise<void> {
     await Promise.all([this.pollCurrent(false), this.pollForecast('silent')]);
     if (this.host !== host) return;
-    const summary = [this.currentReceipt(this.current!, 'passive'), this.forecastReceipt(this.forecast!, 'passive')].join('\n\n');
     // Temporary workaround: startup replay can requeue an already queued persisted event.
     host.pushDeferred({
       type: 'realtime-weather.summary', senderKey: this.id, origin: 'external',
-      render: () => this.host === host ? summary : null,
+      render: () => this.host === host ? [this.currentReceipt(this.current!, 'passive'), this.forecastReceipt(this.forecast!, 'passive')].join('\n\n') : null,
     });
     this.schedule(() => this.pollCurrent(), REALTIME_WEATHER_CURRENT_INTERVAL_MS);
     this.schedule(() => this.pollForecast(), REALTIME_WEATHER_FORECAST_INTERVAL_MS);

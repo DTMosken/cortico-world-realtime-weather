@@ -8,6 +8,24 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('延迟投递启动摘要时采用最新轮询数据和文案，只投递一次', async () => {
+    fixture = await service('Australia/Sydney', true);
+    await fixture.start();
+    fixture.now += 3600000;
+    fixture.current = weather({ condition: { code: '100' }, temperature: { value: 28 } });
+    fixture.hours[0].temperature.value = 30;
+    await fixture.world.pollCurrent(); await fixture.world.pollForecast();
+    await fixture.flushDeferred();
+    const summaries = fixture.events.filter(e => e.type === 'realtime-weather.summary');
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].text).toContain('18:15｜晴');
+    expect(summaries[0].text).toContain('28°C');
+    expect(summaries[0].text).not.toContain('17:15｜');
+    expect(summaries[0].text).toContain('AQI(CN) 85（良，17:15）');
+    await fixture.flushDeferred();
+    expect(fixture.events.filter(e => e.type === 'realtime-weather.summary')).toHaveLength(1);
+  });
+
   it('跨整点合入完整预报时只重置实际展示小时的基线', async () => {
     fixture = await service('UTC');
     fixture.now = Date.parse('2026-10-31T07:30:00Z');

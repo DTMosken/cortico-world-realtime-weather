@@ -7,9 +7,16 @@ export function clock(at: string | number | Date, timezone: string): string {
 export function dateKey(at: string | number | Date, timezone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(at));
 }
-export function period(at: string | number | Date, timezone: string): string {
+export function period(at: string | number | Date, timezone: string, location?: Location): string {
   const [hour, minute] = clock(at, timezone).split(':').map(Number);
   const minutes = hour * 60 + minute;
+  if (location && minutes >= 480) {
+    const now = new Date(at).getTime();
+    const times = solarTimes(now, location, timezone);
+    if (times.alwaysUp || times.sunset && now < times.sunset.getTime()) return 'day';
+    if (times.sunset && times.dusk && now >= times.sunset.getTime() && now < times.dusk.getTime()) return 'evening';
+    return minutes < 1410 ? 'night' : 'lateNight';
+  }
   return minutes >= 300 && minutes < 480 ? 'morning' : minutes >= 480 && minutes < 1020 ? 'day' : minutes >= 1020 && minutes < 1170 ? 'evening' : minutes >= 1170 && minutes < 1410 ? 'night' : 'lateNight';
 }
 function offsetMinutes(at: number, timezone: string): number {

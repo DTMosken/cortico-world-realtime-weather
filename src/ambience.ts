@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, watchFile, unwatchFile, writeFileSync } from 'node:fs';
 import defaults from './ambience.default.json' with { type: 'json' };
+import type { Location } from './config.ts';
 import { period } from './time.ts';
 
 export interface AmbienceRule {
@@ -45,8 +46,8 @@ export class Ambience {
     const candidates = matches.filter(r => r.priority === priority).flatMap(r => r.texts.map(text => ({ text, when: r.when })));
     return candidates.length ? candidates[Math.floor(this.random() * candidates.length)] : undefined;
   }
-  render(kind: 'current' | 'forecast' | 'sunrise' | 'sunset', trigger: 'active' | 'passive', at: string, timezone: string, tags: string[], alertTypes: Record<string, string> = {}): string {
-    const all = new Set([kind, trigger, period(at, timezone), ...tags]);
+  render(kind: 'current' | 'forecast' | 'sunrise' | 'sunset', trigger: 'active' | 'passive', at: string, timezone: string, tags: string[], alertTypes: Record<string, string> = {}, location?: Location): string {
+    const all = new Set([kind, trigger, period(at, timezone, location), ...tags]);
     const weatherTags = new Set([...all].filter(t => !t.startsWith('alert')));
     const alertTags = all;
     const complete = this.select('complete', weatherTags);

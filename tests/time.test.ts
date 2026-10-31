@@ -1,8 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { clock, dateKey, isDaylight, solarTimes, nextDailyForecastAt } from '../src/time.ts';
+import { clock, dateKey, period, isDaylight, solarTimes, nextDailyForecastAt } from '../src/time.ts';
 import type { Location } from '../src/config.ts';
 const location: Location = { name: 'Example', country: 'Example', province: '', city: '', latitude: -34, longitude: 151, timezone: 'Australia/Sydney' };
 describe('部署时区与天文', () => {
+  it('暮色使用地点日落至民用暮光结束，夏季17点仍为日间', () => {
+    const zone = location.timezone;
+    const at = Date.parse('2026-10-31T06:00:00Z');
+    const times = solarTimes(at, location, zone);
+    expect(period(at, zone, location)).toBe('day');
+    expect(period(times.sunset!.getTime() - 1, zone, location)).toBe('day');
+    expect(period(times.sunset!, zone, location)).toBe('evening');
+    expect(period(times.dusk!, zone, location)).toBe('night');
+    const polar = { ...location, latitude: 80, longitude: 0, timezone: 'UTC' };
+    expect(period('2026-06-21T18:00:00Z', 'UTC', polar)).toBe('day');
+    expect(period('2026-12-21T18:00:00Z', 'UTC', polar)).toBe('night');
+  });
+
   it.each([
     ['2026-10-30T20:59:00Z', 'Australia/Sydney', '2026-10-30T21:00:00Z'],
     ['2026-10-30T21:00:00Z', 'Australia/Sydney', '2026-10-31T21:00:00Z'],
