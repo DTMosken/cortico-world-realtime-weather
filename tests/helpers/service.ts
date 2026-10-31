@@ -10,11 +10,11 @@ import { RealtimeWeatherWorld } from '../../src/world.ts';
 export function weather(overrides: Record<string, unknown> = {}) {
   return { condition: { code: '104', text: 'PRIVATE_LOCATION' }, temperature: { value: 22, unit: '°C' }, feelsLike: { value: 24 }, wind: { direction: { compass: 'e' }, scale: 3 }, precipitation: { type: 'none', intensity: { value: 0 }, probability: 0.1, amount: { value: 0 } }, visibility: { value: 8000 }, uvIndex: 2, ...overrides };
 }
-export async function service() {
+export async function service(timezone = 'Australia/Sydney') {
   let now = Date.parse('2026-10-31T06:15:00Z');
   let current = weather();
   let hours = [1, 2, 3].map(offset => ({ ...weather(), forecastTime: new Date(now + offset * 3600000).toISOString() }));
-  let days = [{ forecastStartTime: '2026-10-30T14:00:00Z', temperatureMin: { value: 18 }, temperatureMax: { value: 25 }, uvIndexMax: 4, daytime: weather(), nighttime: weather() }, { forecastStartTime: '2026-10-31T14:00:00Z', temperatureMin: { value: 15 }, temperatureMax: { value: 23 }, uvIndexMax: 4, daytime: weather(), nighttime: weather() }];
+  let days = [{ forecastStartTime: '2026-10-31T00:00:00+11:00', temperatureMin: { value: 18 }, temperatureMax: { value: 25 }, uvIndexMax: 4, daytime: weather(), nighttime: weather() }, { forecastStartTime: '2026-11-01T00:00:00+11:00', temperatureMin: { value: 15 }, temperatureMax: { value: 23 }, uvIndexMax: 4, daytime: weather(), nighttime: weather() }];
   let alerts: unknown[] = [];
   let air = { indexes: [{ code: 'cn-mee', aqiDisplay: '85', level: '2', category: '良', primaryPollutant: { code: 'pm2p5' } }], pollutants: [{ code: 'pm2p5', concentration: { value: 48 } }], stations: [{ name: 'PRIVATE_LOCATION' }] };
   const counts = { current: 0, alerts: 0, air: 0, hours: 0, days: 0, cities: 0 };
@@ -39,9 +39,9 @@ export async function service() {
     return fetch(`http://127.0.0.1:${address.port}${url.pathname}${url.search}`, init);
   };
   const botDir = mkdtempSync(join(tmpdir(), 'weather-extension-'));
-  const cfg: RealtimeWeatherConfigSection = { ...REALTIME_WEATHER_DEFAULTS, apiHost: 'example.qweatherapi.com', location: { id: 'example-city', name: 'PRIVATE_LOCATION', country: 'Example', province: 'North', city: 'District', latitude: 42.33, longitude: 101.12, timezone: 'Australia/Sydney' } };
+  const cfg: RealtimeWeatherConfigSection = { ...REALTIME_WEATHER_DEFAULTS, apiHost: 'example.qweatherapi.com', location: { id: 'example-city', name: 'PRIVATE_LOCATION', country: 'Example', province: 'North', city: 'District', latitude: 42.33, longitude: 101.12 } };
   let restarts = 0;
-  const context: WorldContext<RealtimeWeatherConfigSection> = { id: 'realtime-weather', cfg, timezone: 'UTC', botName: 'example', botDir, dataDir: botDir, repoRoot: botDir, packageDir: botDir, secret: () => 'PRIVATE_KEY', storeSecret: () => {}, persist: patch => { Object.assign(cfg, patch); }, restart: async () => { restarts++; } };
+  const context: WorldContext<RealtimeWeatherConfigSection> = { id: 'realtime-weather', cfg, timezone, botName: 'example', botDir, dataDir: botDir, repoRoot: botDir, packageDir: botDir, secret: () => 'PRIVATE_KEY', storeSecret: () => {}, persist: patch => { Object.assign(cfg, patch); }, restart: async () => { restarts++; } };
   const events: EventEnvelope[] = [];
   const host = { pushEvent: async (e: EventEnvelope) => { events.push(e); return e; }, log: { warn: () => {} } } as unknown as WorldHost;
   const world = new RealtimeWeatherWorld(context, { request, now: () => now, openFile: async () => {}, random: () => 0 });

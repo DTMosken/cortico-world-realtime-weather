@@ -12,11 +12,22 @@ export function period(at: string | number | Date, timezone: string): string {
   const minutes = hour * 60 + minute;
   return minutes >= 300 && minutes < 480 ? 'morning' : minutes >= 480 && minutes < 1020 ? 'day' : minutes >= 1020 && minutes < 1170 ? 'evening' : minutes >= 1170 && minutes < 1410 ? 'night' : 'lateNight';
 }
-export function solarTimes(at: number, location: Location) {
-  const offsetText = new Intl.DateTimeFormat('en', { timeZone: location.timezone, timeZoneName: 'longOffset' }).formatToParts(at).find(p => p.type === 'timeZoneName')!.value;
+function offsetMinutes(at: number, timezone: string): number {
+  const offsetText = new Intl.DateTimeFormat('en', { timeZone: timezone, timeZoneName: 'longOffset' }).formatToParts(at).find(p => p.type === 'timeZoneName')!.value;
   const match = /GMT([+-])(\d{2}):(\d{2})/.exec(offsetText);
-  const offsetMinutes = match ? (Number(match[2]) * 60 + Number(match[3])) * (match[1] === '-' ? -1 : 1) : 0;
-  return getTimes(new Date(at), location.latitude, location.longitude, 0, offsetMinutes);
+  return match ? (Number(match[2]) * 60 + Number(match[3])) * (match[1] === '-' ? -1 : 1) : 0;
+}
+export function nextDailyForecastAt(now: number, timezone: string): number {
+  const wall = Date.parse(`${dateKey(now, timezone)}T08:00:00Z`);
+  const resolve = (target: number) => {
+    const candidate = target - offsetMinutes(target, timezone) * 60_000;
+    return target - offsetMinutes(candidate, timezone) * 60_000;
+  };
+  const today = resolve(wall);
+  return today > now ? today : resolve(wall + 24 * 60 * 60_000);
+}
+export function solarTimes(at: number, location: Location, timezone: string) {
+  return getTimes(new Date(at), location.latitude, location.longitude, 0, offsetMinutes(at, timezone));
 }
 export function isDaylight(at: number, location: Location): boolean {
   return getPosition(new Date(at), location.latitude, location.longitude).altitude >= -0.833;

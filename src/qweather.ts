@@ -119,8 +119,8 @@ export class QWeather {
     return result.hours.map(h => ({ ...normalizeWeather(h), at: h.forecastTime }));
   }
   async daily(signal?: AbortSignal): Promise<Day[]> {
-    const result = await this.get<{ days: RawDay[] }>(`/weather/v1/daily/${this.point()}?days=${this.cfg.forecastDays}&lang=zh`, signal);
-    return result.days.map(d => ({ date: new Intl.DateTimeFormat('en-CA', { timeZone: this.cfg.location!.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(d.forecastStartTime)), daytime: normalizeWeather(d.daytime), nighttime: normalizeWeather(d.nighttime), min: d.temperatureMin?.value, max: d.temperatureMax?.value, uv: d.uvIndexMax }));
+    const result = await this.get<{ days: RawDay[] }>(`/weather/v1/daily/${this.point()}?days=${this.cfg.forecastDays}&localTime=true&lang=zh`, signal);
+    return result.days.map(d => ({ date: d.forecastStartTime.slice(0, 10), daytime: normalizeWeather(d.daytime), nighttime: normalizeWeather(d.nighttime), min: d.temperatureMin?.value, max: d.temperatureMax?.value, uv: d.uvIndexMax }));
   }
   async air(at: string, signal?: AbortSignal): Promise<Air> {
     const result = await this.get<{ indexes: { code: string; aqiDisplay: string; level: string; category: string; primaryPollutant?: { code: string } }[]; pollutants: { code: string; concentration: Value }[] }>(`/airquality/v1/current/${this.point()}?lang=zh`, signal);
@@ -140,6 +140,6 @@ export class QWeather {
     if (filters.range?.trim()) params.set('range', filters.range.trim().toLowerCase());
     const result = await this.get<{ code: string; location?: { id: string; name: string; country: string; adm1: string; adm2: string; lat: string; lon: string; tz: string }[] }>(`/geo/v2/city/lookup?${params}`, signal);
     if (result.code !== '200') throw new Error(`城市搜索：${/^\d{3}$/.test(result.code) ? result.code : '响应错误'}`);
-    return (result.location ?? []).map(l => ({ id: l.id, name: l.name, country: l.country, province: l.adm1, city: l.adm2, latitude: Number(l.lat), longitude: Number(l.lon), timezone: l.tz }));
+    return (result.location ?? []).map(l => ({ id: l.id, name: l.name, country: l.country, province: l.adm1, city: l.adm2, latitude: Number(l.lat), longitude: Number(l.lon) }));
   }
 }
