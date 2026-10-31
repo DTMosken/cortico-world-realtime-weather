@@ -6,6 +6,56 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('第三小时达到阈值的变化进入展示窗口后只提醒一次', async () => {
+    fixture = await service(); await fixture.world.start(fixture.host); fixture.events.length = 0;
+    fixture.hours[2].uvIndex = 5;
+    await fixture.world.pollForecast(); expect(fixture.events).toEqual([]);
+    fixture.now += 3600000 + 1;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).toContain('UV 2→5');
+    await fixture.world.pollForecast(); expect(fixture.events).toHaveLength(1);
+  });
+  it('地点时区失败后十五分钟恢复初始化，摘要和常规轮询不重复', async () => {
+    fixture = await service(); fixture.errors.cities = 503;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      await fixture.world.start(fixture.host);
+      expect(fixture.world.webUi().lamps?.[0].state).toBe('error');
+      expect(fixture.events).toEqual([]); expect(fixture.counts.current).toBe(0);
+      for (const tool of fixture.world.tools()) expect(await tool.handler({}, {} as never)).toBe('地点时区查询失败：QWeather HTTP 503');
+      expect(fixture.counts.current).toBe(0); expect(fixture.counts.hours).toBe(0);
+      delete fixture.errors.cities;
+      fixture.now += REALTIME_WEATHER_CURRENT_INTERVAL_MS;
+      await vi.advanceTimersByTimeAsync(REALTIME_WEATHER_CURRENT_INTERVAL_MS);
+      await vi.waitFor(() => expect(fixture!.events).toHaveLength(1));
+      expect(fixture.counts).toMatchObject({ cities: 2, current: 1, hours: 1 });
+      expect(fixture.world.webUi().lamps?.[0].state).toBe('online');
+      fixture.now += REALTIME_WEATHER_CURRENT_INTERVAL_MS;
+      await vi.advanceTimersByTimeAsync(REALTIME_WEATHER_CURRENT_INTERVAL_MS);
+      await vi.waitFor(() => expect(fixture!.counts.current).toBe(2));
+      expect(fixture.counts.cities).toBe(2); expect(fixture.events).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+  it('时区初始化失败后停止会取消重试', async () => {
+    fixture = await service(); fixture.errors.cities = 503;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      await fixture.world.start(fixture.host); await fixture.world.stop();
+      await vi.advanceTimersByTimeAsync(REALTIME_WEATHER_CURRENT_INTERVAL_MS * 2);
+      expect(fixture.counts.cities).toBe(1); expect(fixture.events).toEqual([]);
+    } finally { vi.useRealTimers(); }
+  });
+  it('测试连接包含地点时区错误，恢复后才重启', async () => {
+    fixture = await service(); fixture.errors.cities = 503;
+    const invoke = fixture.world.webUi().invoke!;
+    expect(await invoke('config', 'testConnection', [])).toMatchObject({ errors: { timezone: 'QWeather HTTP 503' } });
+    expect(fixture.restarts).toBe(0);
+    delete fixture.errors.cities;
+    expect(await invoke('config', 'testConnection', [])).toMatchObject({ errors: {} });
+    expect(fixture.restarts).toBe(1);
+  });
+
   it('启动摘要在投递前不落库，补投扫描不可见，投递时仅产生一条', async () => {
     fixture = await service('Australia/Sydney', true);
     await fixture.world.start(fixture.host);

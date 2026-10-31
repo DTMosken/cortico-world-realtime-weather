@@ -70,6 +70,7 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
       add(value > previous ? up : down, `${label}${display(previous)}→${display(value)}`);
     } else if (!resetBaseline) baseline[key] = previous;
   }
+  if (current.visibilityKm === undefined) baseline.visibilityKm = before.visibilityKm;
   if (before.visibilityKm !== undefined && current.visibilityKm !== undefined && (before.visibilityKm < cfg.visibilityThresholdKm) !== (current.visibilityKm < cfg.visibilityThresholdKm)) add(current.visibilityKm < cfg.visibilityThresholdKm ? 'visibilityDown' : 'visibilityUp', `能见度${before.visibilityKm}→${current.visibilityKm} km`);
   return { changes, baseline };
 }

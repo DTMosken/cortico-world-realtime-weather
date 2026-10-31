@@ -4,6 +4,17 @@ import { REALTIME_WEATHER_DEFAULTS } from '../src/config.ts';
 import type { Alert, Weather } from '../src/model.ts';
 const base: Weather = { conditionCode: '100', condition: '晴', temperature: 22, feelsLike: 22, precipitationType: 'none', visibilityKm: 8, uv: 2, windScale: 2 };
 describe('双向变化', () => {
+  it.each([false, true])('能见度缺失不清除跨阈值基线，完整回执=%s', reset => {
+    let baseline = { ...base, visibilityKm: 5 };
+    for (const value of [0.5, 5]) {
+      const missing = weatherChanges(baseline, { ...base, visibilityKm: undefined }, REALTIME_WEATHER_DEFAULTS, reset);
+      expect(missing.baseline.visibilityKm).toBe(baseline.visibilityKm);
+      const result = weatherChanges(missing.baseline, { ...base, visibilityKm: value }, REALTIME_WEATHER_DEFAULTS);
+      expect(result.changes.map(c => c.id)).toEqual([value < 1 ? 'visibilityDown' : 'visibilityUp']);
+      baseline = result.baseline as typeof baseline;
+    }
+  });
+
   it.each([
     ['uv', 2, 4, 5, 'uvUp'],
     ['temperature', 22, 24, 25, 'temperatureUp'],
