@@ -4,6 +4,24 @@ import { REALTIME_WEATHER_DEFAULTS } from '../src/config.ts';
 import type { Alert, Weather } from '../src/model.ts';
 const base: Weather = { conditionCode: '100', condition: '晴', temperature: 22, feelsLike: 22, precipitationType: 'none', visibilityKm: 8, uv: 2, windScale: 2 };
 describe('双向变化', () => {
+  it.each([
+    ['uv', 2, 4, 5, 'uvUp'],
+    ['temperature', 22, 24, 25, 'temperatureUp'],
+    ['feelsLike', 22, 24, 25, 'feelsLikeUp'],
+    ['windScale', 2, 3, 4, 'windUp'],
+    ['precipitationProbability', 0.1, 0.2, 0.4, 'probabilityUp'],
+  ] as const)('%s缺失一轮后仍相对最近提醒累计', (key, initial, interim, final, id) => {
+    let baseline: Weather = { ...base, [key]: initial };
+    for (const value of [interim, undefined]) {
+      const result = weatherChanges(baseline, { ...base, [key]: value }, REALTIME_WEATHER_DEFAULTS);
+      expect(result.changes).toEqual([]);
+      baseline = result.baseline;
+      expect(baseline[key]).toBe(initial);
+    }
+    const result = weatherChanges(baseline, { ...base, [key]: final }, REALTIME_WEATHER_DEFAULTS);
+    expect(result.changes.map(c => c.id)).toEqual([id]);
+  });
+
   it.each([[2, 3], [3, 5], [6, 7], [3, 2]])('UV %s到%s的小幅变化不通知', (before, after) => {
     expect(weatherChanges({ ...base, uv: before }, { ...base, uv: after }, REALTIME_WEATHER_DEFAULTS).changes).toEqual([]);
   });

@@ -6,6 +6,79 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('完整预报刷新已播报数值基线，未展示的第三小时保留累计', async () => {
+    fixture = await service();
+    await fixture.world.start(fixture.host); fixture.events.length = 0;
+    fixture.hours.forEach(h => { h.uvIndex = 4; h.temperature.value = 24; });
+    fixture.days[0].uvIndexMax = 6;
+    fixture.days[0].temperatureMin.value = 20;
+    fixture.days[0].temperatureMax.value = 27;
+    await fixture.world.pollForecast('summary');
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).toContain('UV 4');
+    fixture.hours.forEach(h => { h.uvIndex = 5; h.temperature.value = 25; });
+    fixture.days[0].uvIndexMax = 7;
+    fixture.days[0].temperatureMin.value = 21;
+    fixture.days[0].temperatureMax.value = 28;
+    // Keep the third hour unchanged until it enters the displayed window.
+    fixture.hours[2].uvIndex = 4; fixture.hours[2].temperature.value = 24;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(1);
+    fixture.now += 3600000;
+    fixture.hours[2].uvIndex = 5;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(2);
+    expect(fixture.events[1].text).toContain('UV 2→5');
+    fixture.hours[1].uvIndex = 7;
+    fixture.days[0].uvIndexMax = 9;
+    fixture.days[0].temperatureMin.value = 23;
+    await fixture.world.pollForecast();
+    expect(fixture.events.at(-1)!.text).toContain('UV 4→7');
+    expect(fixture.events.at(-1)!.text).toContain('UV最高9');
+  });
+  it.each([false, true])('每日摘要与小时轮询重叠只发送完整预报，摘要先发起=%s', async (summaryFirst) => {
+    fixture = await service();
+    await fixture.world.start(fixture.host); fixture.events.length = 0;
+    fixture.hours[0].uvIndex = 5;
+    let release!: () => void;
+    fixture.holds.hours = new Promise<void>(resolve => { release = resolve; });
+    const first = fixture.world.pollForecast(summaryFirst ? 'summary' : 'changes');
+    let second: Promise<void> | undefined;
+    try {
+      await vi.waitFor(() => expect(fixture!.counts.hours).toBe(2));
+      second = fixture.world.pollForecast(summaryFirst ? 'changes' : 'summary');
+    } finally { release(); await Promise.all([first, second]); }
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).toContain('UV 5');
+    expect(fixture.events[0].text).toContain('11/01');
+    expect(fixture.events[0].text).not.toContain('UV 2→5');
+    expect(fixture.counts).toMatchObject({ hours: 2, days: 2 });
+  });
+  it('逐小时与逐日缺失数值不会清除UV和温度极值基线', async () => {
+    fixture = await service();
+    await fixture.world.start(fixture.host); fixture.events.length = 0;
+    fixture.hours[0].uvIndex = 4;
+    fixture.days[0].uvIndexMax = 6;
+    fixture.days[0].temperatureMin.value = 20;
+    fixture.days[0].temperatureMax.value = 27;
+    await fixture.world.pollForecast();
+    Reflect.deleteProperty(fixture.hours[0], 'uvIndex');
+    Reflect.deleteProperty(fixture.days[0], 'uvIndexMax');
+    Reflect.deleteProperty(fixture.days[0], 'temperatureMin');
+    Reflect.deleteProperty(fixture.days[0], 'temperatureMax');
+    await fixture.world.pollForecast('summary');
+    expect(fixture.events).toHaveLength(1);
+    fixture.hours[0].uvIndex = 5;
+    fixture.days[0].uvIndexMax = 7;
+    fixture.days[0].temperatureMin = { value: 21 };
+    fixture.days[0].temperatureMax = { value: 28 };
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(2);
+    expect(fixture.events[1].text).toContain('UV 2→5');
+    expect(fixture.events[1].text).toContain('21–28°C');
+    expect(fixture.events[1].text).toContain('UV最高7');
+  });
+
   it('逐小时和逐日UV修订累计达到3才通知', async () => {
     fixture = await service();
     await fixture.world.start(fixture.host); fixture.events.length = 0;

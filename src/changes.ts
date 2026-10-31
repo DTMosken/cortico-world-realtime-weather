@@ -7,8 +7,8 @@ export function precipitationRank(w: Weather): number | undefined {
   return ranks[w.conditionCode];
 }
 
-/** 数字基线只在对应阈值触发时前移；其他字段保持最近成功状态。 */
-export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeWeatherConfigSection): { changes: Change[]; baseline: Weather } {
+/** 数值基线在达到阈值或完整通知时前移；缺失数值保留基线。 */
+export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeWeatherConfigSection, resetBaseline = false): { changes: Change[]; baseline: Weather } {
   const changes: Change[] = [];
   const baseline: Weather = { ...current };
   const add = (id: string, text: string) => changes.push({ id, text });
@@ -62,12 +62,13 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     ['precipitationProbability', cfg.precipitationProbabilityChange / 100, '', '降水概率', 'probabilityUp', 'probabilityDown'],
   ] as const) {
     const previous = before[key], value = current[key];
-    if (previous === undefined || value === undefined) continue;
+    if (value === undefined) { baseline[key] = previous; continue; }
+    if (previous === undefined) continue;
     const delta = key === 'precipitationProbability' ? Math.abs(Math.round(value * 100) - Math.round(previous * 100)) / 100 : Math.abs(value - previous);
     if (delta >= threshold) {
       const display = (n: number) => key === 'precipitationProbability' ? `${Math.round(n * 100)}%` : `${Math.round(n * 10) / 10}${unit}`;
       add(value > previous ? up : down, `${label}${display(previous)}→${display(value)}`);
-    } else baseline[key] = previous;
+    } else if (!resetBaseline) baseline[key] = previous;
   }
   if (before.visibilityKm !== undefined && current.visibilityKm !== undefined && (before.visibilityKm < cfg.visibilityThresholdKm) !== (current.visibilityKm < cfg.visibilityThresholdKm)) add(current.visibilityKm < cfg.visibilityThresholdKm ? 'visibilityDown' : 'visibilityUp', `能见度${before.visibilityKm}→${current.visibilityKm} km`);
   return { changes, baseline };

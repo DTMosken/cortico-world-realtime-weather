@@ -23,6 +23,9 @@ export const REALTIME_WEATHER_TOOL_DECLS: ReadonlyArray<Omit<ToolDef, 'handler'>
   { name: 'realtime_weather_current', description: '查看配置地点的当前天气、空气质量与有效天气预警。', tags: ['read'], parameters: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'realtime_weather_forecast', description: '查看未来第1、第2小时与多日天气预报；明天天气取逐日摘要。', tags: ['read'], parameters: { type: 'object', properties: {}, additionalProperties: false } },
 ];
+type ForecastPollMode = 'changes' | 'summary' | 'silent';
+interface ForecastPoll { mode: ForecastPollMode; promise: Promise<void> }
+
 export interface RealtimeWeatherWorldOptions {
   request?: typeof fetch;
   now?: () => number;
@@ -45,6 +48,7 @@ export class RealtimeWeatherWorld implements World {
   private currentFlight?: Promise<Current>;
   private airFlight?: Promise<PromiseSettledResult<Air>>;
   private forecastFlight?: Promise<Forecast>;
+  private forecastPoll?: ForecastPoll;
   private current?: Current;
   private forecast?: Forecast;
   private weatherBaseline?: Weather;
@@ -176,9 +180,23 @@ export class RealtimeWeatherWorld implements World {
     this.previous = current;
     if (notify && receipt && host && this.host === host && !this.controller.signal.aborted) await this.push('realtime-weather.changed', receipt);
   }
-  async pollForecast(mode: 'changes' | 'summary' | 'silent' = 'changes'): Promise<void> {
+  pollForecast(mode: ForecastPollMode = 'changes'): Promise<void> {
+    if (this.forecastPoll) {
+      if (mode === 'summary' || this.forecastPoll.mode === 'silent') this.forecastPoll.mode = mode;
+      return this.forecastPoll.promise;
+    }
+    const poll: ForecastPoll = { mode, promise: Promise.resolve() };
+    this.forecastPoll = poll;
+    poll.promise = this.runForecastPoll(poll).finally(() => {
+      if (this.forecastPoll === poll) this.forecastPoll = undefined;
+    });
+    return poll.promise;
+  }
+  private async runForecastPoll(poll: ForecastPoll): Promise<void> {
     const host = this.host;
     const current = await this.loadForecast();
+    const mode = poll.mode;
+    this.forecastPoll = undefined;
     const changes: Change[] = [];
     const next: Forecast = { ...current, hours: [], days: [] };
     const selection: ForecastSelection = { hours: new Map(), days: new Map() };
@@ -187,7 +205,7 @@ export class RealtimeWeatherWorld implements World {
       const old = this.previousForecast?.hours.find(h => h.at === hour.at);
       if (current.errors.hours) { next.hours.push(old ?? hour); continue; }
       if (old) {
-        const result = weatherChanges(old, hour, this.ctx.cfg);
+        const result = weatherChanges(old, hour, this.ctx.cfg, mode === 'summary' && visibleHours.has(hour.at));
         if (result.changes.length && visibleHours.has(hour.at)) {
           changes.push({ id: 'hourChanged', text: `${clock(hour.at, this.timezone())}｜${result.changes.map(c => c.text).join('｜')}` });
           selection.hours.set(hour.at, result.changes);
@@ -203,17 +221,19 @@ export class RealtimeWeatherWorld implements World {
       let changed = false;
       if (old && !current.errors.days) {
         for (const part of ['daytime', 'nighttime'] as const) {
-          const result = weatherChanges(old[part], day[part], this.ctx.cfg);
+          const result = weatherChanges(old[part], day[part], this.ctx.cfg, mode === 'summary');
           baseline[part] = result.baseline;
           dayChanges.push(...result.changes);
           changed ||= result.changes.length > 0;
         }
-        for (const key of ['min', 'max'] as const) if (old[key] !== undefined && day[key] !== undefined) {
+        for (const key of ['min', 'max'] as const) {
+          if (day[key] === undefined) { baseline[key] = old[key]; continue; }
+          if (old[key] === undefined) continue;
           if (Math.abs(day[key]! - old[key]!) >= this.ctx.cfg.temperatureChange) { changed = true; dayChanges.push({ id: day[key]! > old[key]! ? 'temperatureUp' : 'temperatureDown', text: '' }); }
-          else baseline[key] = old[key];
+          else if (mode !== 'summary') baseline[key] = old[key];
         }
-        if (old.uv !== undefined && day.uv !== undefined) {
-          const uvChanges = weatherChanges({ ...old.daytime, uv: old.uv }, { ...day.daytime, uv: day.uv }, this.ctx.cfg);
+        {
+          const uvChanges = weatherChanges({ ...old.daytime, uv: old.uv }, { ...day.daytime, uv: day.uv }, this.ctx.cfg, mode === 'summary');
           baseline.uv = uvChanges.baseline.uv;
           changed ||= uvChanges.changes.some(c => c.id === 'uvUp' || c.id === 'uvDown');
         }
