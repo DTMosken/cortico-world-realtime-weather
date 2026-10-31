@@ -332,7 +332,7 @@
       "part": "body",
       "when": [
         "current",
-        "cloudy"
+        "thickCloud"
       ],
       "texts": [
         "天色阴沉沉的，厚重的云层压得很低。"

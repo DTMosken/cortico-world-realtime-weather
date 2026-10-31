@@ -10,6 +10,21 @@ afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
   it.each([
+    ['101', true], ['104', true], ['151', true],
+    ['102', false], ['103', false], ['152', false], ['153', false],
+  ])('实况%s在启动摘要和主动查询中是否匹配厚云句 %s', async (code, thick) => {
+    fixture = await service();
+    fixture.current = weather({ condition: { code } });
+    await fixture.start();
+    const summary = fixture.events.find(e => e.type === 'realtime-weather.summary')!.text!;
+    const active = String(await fixture.world.tools()[0].handler({}, {} as never));
+    for (const text of [summary, active]) {
+      if (thick) expect(text).toContain('厚重的云层压得很低');
+      else expect(text).not.toContain('厚重的云层压得很低');
+    }
+  });
+
+  it.each([
     ['100', '152', false], ['104', '153', false], ['100', '151', true], ['100', '104', true],
   ])('夜间%s到%s按云量选择厚云或通用文案', async (before, after, thick) => {
     fixture = await service();
