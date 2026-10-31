@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: Prepare a version PR, publish, or finish an npm release
+        description: Prepare a version branch, publish, or finish an npm release
         type: choice
         required: true
         default: patch
@@ -31,7 +31,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
-      pull-requests: write
       actions: write
       id-token: write
     defaults:
@@ -128,7 +127,7 @@ jobs:
           console.log(pkg.name + '@' + pkg.version + ': ' + pack.files.length + ' files');
           NODE
 
-      - name: Open version PR
+      - name: Prepare version branch
         if: inputs.release_type != 'publish' && inputs.release_type != 'finish'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -140,14 +139,8 @@ jobs:
           git add -- package.json
           git commit -m "build(package.json): release $PACKAGE_VERSION"
           git push origin "HEAD:refs/heads/$branch"
-          cat > "$RUNNER_TEMP/release-pr.md" <<EOF
-          更新 npm 包版本为 $PACKAGE_VERSION。
-
-          合并后，在 main 手动运行 Release 并选择 publish。
-          EOF
-          pr_url=$(gh pr create --base main --head "$branch" --title "build(package.json): release $PACKAGE_VERSION" --body-file "$RUNNER_TEMP/release-pr.md")
           gh workflow run ci.yml --ref "$branch"
-          printf 'Version PR: %s\n' "$pr_url" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Create version PR: https://github.com/%s/compare/main...%s?expand=1\n' "$GITHUB_REPOSITORY" "$branch" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Push version tag
         if: inputs.release_type == 'publish'
