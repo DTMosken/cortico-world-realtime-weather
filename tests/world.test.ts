@@ -9,6 +9,21 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it.each(['预警发布', '降水概率'])('天气仍阴、仅%s变化时不夹带静态厚云句', async (change) => {
+    fixture = await service();
+    await fixture.start(); fixture.events.length = 0;
+    if (change === '预警发布') {
+      fixture.alerts = [{ id: 'a', eventType: { name: 'wind', code: 'example' }, severity: 'severe', messageType: { code: 'alert' } }];
+    } else {
+      fixture.current = weather({ precipitation: { type: 'none', intensity: { value: 0 }, probability: 0.8, amount: { value: 0 } } });
+    }
+    await fixture.world.pollCurrent();
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].type).toBe('realtime-weather.changed');
+    expect(fixture.events[0].text).toContain(change);
+    expect(fixture.events[0].text).not.toContain('厚重的云层压得很低');
+  });
+
   it.each([
     ['101', true], ['104', true], ['151', true],
     ['102', false], ['103', false], ['152', false], ['153', false],

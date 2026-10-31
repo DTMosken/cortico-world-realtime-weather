@@ -332,6 +332,7 @@
       "part": "body",
       "when": [
         "current",
+        "cloudy",
         "thickCloud"
       ],
       "texts": [
