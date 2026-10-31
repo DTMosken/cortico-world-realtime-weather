@@ -6,6 +6,49 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('普通逐日通知刷新同时展示的UV及温度极值基线', async () => {
+    fixture = await service();
+    await fixture.world.start(fixture.host); fixture.events.length = 0;
+    fixture.days[0].daytime = weather({ condition: { code: '100' } });
+    fixture.days[0].uvIndexMax = 6;
+    fixture.days[0].temperatureMin.value = 20;
+    fixture.days[0].temperatureMax.value = 27;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).toContain('20–27°C');
+    expect(fixture.events[0].text).toContain('UV最高6');
+    fixture.days[0].uvIndexMax = 7;
+    fixture.days[0].temperatureMin.value = 21;
+    fixture.days[0].temperatureMax.value = 28;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(1);
+    fixture.days[0].uvIndexMax = 9;
+    fixture.days[0].temperatureMin.value = 23;
+    fixture.days[0].temperatureMax.value = 30;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(2);
+    expect(fixture.events[1].text).toContain('23–30°C');
+    expect(fixture.events[1].text).toContain('UV最高9');
+  });
+  it.each(['summary', 'changes'] as const)('%s通知缺少最低温时保留未展示的最高温基线', async (mode) => {
+    fixture = await service();
+    await fixture.world.start(fixture.host); fixture.events.length = 0;
+    Reflect.deleteProperty(fixture.days[0], 'temperatureMin');
+    fixture.days[0].temperatureMax.value = 27;
+    fixture.days[0].daytime = weather({ condition: { code: '100' } });
+    await fixture.world.pollForecast(mode);
+    expect(fixture.events).toHaveLength(1);
+    const line = fixture.events[0].text!.split('\n').find(l => l.startsWith('10/31'))!;
+    expect(line).not.toContain('°C');
+    fixture.days[0].temperatureMax.value = 28;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(1);
+    fixture.days[0].temperatureMin = { value: 18 };
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(2);
+    expect(fixture.events[1].text).toContain('18–28°C');
+  });
+
   it('完整预报刷新已播报数值基线，未展示的第三小时保留累计', async () => {
     fixture = await service();
     await fixture.world.start(fixture.host); fixture.events.length = 0;

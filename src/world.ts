@@ -227,7 +227,7 @@ export class RealtimeWeatherWorld implements World {
           changed ||= result.changes.length > 0;
         }
         for (const key of ['min', 'max'] as const) {
-          if (day[key] === undefined) { baseline[key] = old[key]; continue; }
+          if (day.min === undefined || day.max === undefined) { baseline[key] = old[key]; continue; }
           if (old[key] === undefined) continue;
           if (Math.abs(day[key]! - old[key]!) >= this.ctx.cfg.temperatureChange) { changed = true; dayChanges.push({ id: day[key]! > old[key]! ? 'temperatureUp' : 'temperatureDown', text: '' }); }
           else if (mode !== 'summary') baseline[key] = old[key];
@@ -237,6 +237,10 @@ export class RealtimeWeatherWorld implements World {
           baseline.uv = uvChanges.baseline.uv;
           changed ||= uvChanges.changes.some(c => c.id === 'uvUp' || c.id === 'uvDown');
         }
+      }
+      if (mode === 'summary' || changed) {
+        if (day.min !== undefined && day.max !== undefined) { baseline.min = day.min; baseline.max = day.max; }
+        if (day.uv !== undefined) baseline.uv = day.uv;
       }
       if (changed) { changes.push({ id: 'dayChanged', text: dayLine(day) }); selection.days.set(day.date, dayChanges); }
       next.days.push(baseline);
