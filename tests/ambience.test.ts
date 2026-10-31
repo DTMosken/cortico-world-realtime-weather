@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Ambience } from '../src/ambience.ts';
 
 const directories: string[] = [];
@@ -37,8 +37,10 @@ describe('demo文案与部署覆盖', () => {
     const { file, copy } = create();
     writeFileSync(file, '{'); copy.reload(); copy.start();
     try {
+      // Allow the initial file stat before simulating an operator save.
+      await new Promise(resolve => setTimeout(resolve, 1100));
       writeFileSync(file, JSON.stringify({ version: 1, rules: [{ id: 'custom', part: 'body', when: ['custom'], texts: ['用户提供的原句。'], priority: 1 }] }));
-      await new Promise(resolve => setTimeout(resolve, 1300));
+      await vi.waitFor(() => expect(copy.error).toBe(''), { timeout: 3000, interval: 50 });
       expect(copy.error).toBe(''); expect(copy.render('current', 'active', '2026-10-31T12:00:00Z', 'UTC', ['custom'])).toBe('[用户提供的原句。]');
     } finally { copy.stop(); }
   });
