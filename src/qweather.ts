@@ -111,6 +111,12 @@ export class QWeather {
     if (!location) throw new Error('尚未选择城市或区划');
     return `${location.latitude}/${location.longitude}`;
   }
+  async timezone(signal?: AbortSignal): Promise<string> {
+    const params = new URLSearchParams({ location: this.cfg.location!.id });
+    const result = await this.get<{ code: string; location?: { tz: string }[] }>(`/geo/v2/city/lookup?${params}`, signal);
+    if (result.code !== '200' || !result.location?.[0]?.tz) throw new Error('地点时区查询失败');
+    return result.location[0].tz;
+  }
   async current(signal?: AbortSignal): Promise<Weather> {
     return normalizeWeather(await this.get<RawWeather>(`/weather/v1/current/${this.point()}?lang=zh`, signal));
   }

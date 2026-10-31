@@ -45,8 +45,10 @@ describe('预报文案范围', () => {
     const rain = { ...clear, conditionCode: '305', condition: '小雨', precipitationType: 'rain' };
     expect(tags(snapshot({ days: [day('2026-11-01', { daytime: rain }), day('2026-11-02', { nighttime: rain })] }))).toContain('forecastWet');
   });
-  it('逐日极值跨阈值选降温，逐日升温保留单独标签以免称为待会儿', () => {
-    expect(tags(snapshot({ days: [day('2026-10-31'), day('2026-11-01', { min: 15, max: 22 })] }))).toContain('forecastCold');
+  it('逐日冷暖使用独立标签，不套近期文案', () => {
+    const dailyCold = tags(snapshot({ days: [day('2026-10-31'), day('2026-11-01', { min: 15, max: 22 })] }));
+    expect(dailyCold).toContain('forecastDailyCold');
+    expect(dailyCold).not.toContain('forecastCold');
     const warm = tags(snapshot({ days: [day('2026-10-31'), day('2026-11-01', { min: 21, max: 28 })] }));
     expect(warm).not.toContain('forecastDailyWarm'); expect(warm).not.toContain('forecastWarm');
   });

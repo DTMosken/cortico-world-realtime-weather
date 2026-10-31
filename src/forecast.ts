@@ -62,7 +62,7 @@ export function forecastTags(forecast: Forecast, current: Weather | undefined, c
     const changes = selection?.days.get(day.date);
     if (selection && !changes) continue;
     const deltas = (['min', 'max'] as const).flatMap(key => day[key] !== undefined && before[key] !== undefined ? [day[key]! - before[key]!] : []);
-    if (deltas.some(delta => delta <= -threshold) && (!changes || changes.some(c => c.id === 'temperatureDown'))) tags.add('forecastCold');
+    if (deltas.some(delta => delta <= -threshold) && (!changes || changes.some(c => c.id === 'temperatureDown'))) tags.add('forecastDailyCold');
   }
   const futureDays = days.filter(day => day.date > today);
   // "一路上涨" requires a multi-day rising run, not one isolated warmer day.

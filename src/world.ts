@@ -12,7 +12,7 @@ import { Ambience } from './ambience.ts';
 import { alertChanges, weatherChanges } from './changes.ts';
 import { clock, isDaylight, solarTimes, nextDailyForecastAt } from './time.ts';
 import { forecastTags, type ForecastSelection } from './forecast.ts';
-import { airStandard, currentLine, dayLine, forecastLines } from './format.ts';
+import { airStandard, currentLine, dayLine, dayMetrics, forecastLines } from './format.ts';
 import { weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
 import { ensureParent, openFile, prepareKeyFile } from './files.ts';
 
@@ -42,6 +42,7 @@ export class RealtimeWeatherWorld implements World {
   readonly client: QWeather;
   readonly ambience: Ambience;
   private host?: WorldHost;
+  private locationTimezone?: string;
   private controller = new AbortController();
   private timers = new Set<ReturnType<typeof setTimeout>>();
   private tasks = new Set<Promise<unknown>>();
@@ -78,7 +79,7 @@ export class RealtimeWeatherWorld implements World {
       return this.forecastReceipt(forecast, 'active');
     } }));
   }
-  private timezone(): string { return this.ctx.timezone; }
+  private timezone(): string { return this.locationTimezone ?? this.ctx.timezone; }
   private tags(weather?: Weather): string[] {
     return [...(weather ? weatherTags(weather) : []), ...(this.ctx.cfg.location && isDaylight(this.now(), this.ctx.cfg.location) ? ['daylight'] : ['dark']), ...((weather?.windScale ?? 0) < 4 ? ['calm'] : []), ...(weather && (weatherTags(weather).some(tag => ['cloudy', 'fog'].includes(tag)) || ['rain', 'snow', 'mixed'].includes(weather.precipitationType ?? '')) ? ['cloudyOrWet'] : [])];
   }
@@ -221,10 +222,27 @@ export class RealtimeWeatherWorld implements World {
       let changed = false;
       if (old && !current.errors.days) {
         for (const part of ['daytime', 'nighttime'] as const) {
-          const result = weatherChanges(old[part], day[part], this.ctx.cfg, mode === 'summary');
+          const result = weatherChanges(
+            { ...old[part], windScale: undefined, precipitationProbability: undefined },
+            { ...day[part], windScale: undefined, precipitationProbability: undefined },
+            this.ctx.cfg,
+          );
+          result.baseline.windScale = old[part].windScale;
+          result.baseline.precipitationProbability = old[part].precipitationProbability;
           baseline[part] = result.baseline;
           dayChanges.push(...result.changes);
           changed ||= result.changes.length > 0;
+        }
+        const beforeMetrics = dayMetrics(old), metrics = dayMetrics(day);
+        for (const key of ['windMin', 'windMax', 'probability'] as const) {
+          const before = beforeMetrics[key], value = metrics[key];
+          if (before === undefined || value === undefined) continue;
+          const probability = key === 'probability';
+          const delta = probability ? Math.abs(Math.round(value * 100) - Math.round(before * 100)) : Math.abs(value - before);
+          if (delta >= (probability ? this.ctx.cfg.precipitationProbabilityChange : this.ctx.cfg.windScaleChange)) {
+            changed = true;
+            dayChanges.push({ id: `${probability ? 'probability' : 'wind'}${value > before ? 'Up' : 'Down'}`, text: '' });
+          }
         }
         for (const key of ['min', 'max'] as const) {
           if (day.min === undefined || day.max === undefined) { baseline[key] = old[key]; continue; }
@@ -241,6 +259,12 @@ export class RealtimeWeatherWorld implements World {
       if (mode === 'summary' || changed) {
         if (day.min !== undefined && day.max !== undefined) { baseline.min = day.min; baseline.max = day.max; }
         if (day.uv !== undefined) baseline.uv = day.uv;
+      }
+      for (const key of ['windScale', 'precipitationProbability'] as const) {
+        const hasBaseline = old && (old.daytime[key] !== undefined || old.nighttime[key] !== undefined);
+        if ((mode === 'summary' || changed || !hasBaseline) && (day.daytime[key] !== undefined || day.nighttime[key] !== undefined)) {
+          for (const part of ['daytime', 'nighttime'] as const) baseline[part][key] = day[part][key];
+        }
       }
       if (changed) { changes.push({ id: 'dayChanged', text: dayLine(day) }); selection.days.set(day.date, dayChanges); }
       next.days.push(baseline);
@@ -270,7 +294,7 @@ export class RealtimeWeatherWorld implements World {
         .catch(() => { this.host?.log.warn('每日预报未完成'); })
         .finally(() => { this.tasks.delete(task); if (this.host) this.scheduleDailyForecast(); });
       this.tasks.add(task);
-    }, nextDailyForecastAt(this.now(), this.timezone()) - this.now());
+    }, nextDailyForecastAt(this.now(), this.ctx.timezone) - this.now());
     timer.unref(); this.timers.add(timer);
   }
   private scheduleSolar(): void {
@@ -306,6 +330,8 @@ export class RealtimeWeatherWorld implements World {
     }
     this.host = host; this.controller = new AbortController(); this.ambience.start();
     if (!this.ctx.cfg.location || !this.ctx.cfg.apiHost || !this.ctx.secret(REALTIME_WEATHER_SECRET)) return;
+    this.locationTimezone = await this.client.timezone(this.controller.signal);
+    if (this.host !== host || this.controller.signal.aborted) return;
     await Promise.all([this.pollCurrent(false), this.pollForecast('silent')]);
     if (this.host !== host || this.controller.signal.aborted) return;
     await this.push('realtime-weather.summary', [this.currentReceipt(this.current!, 'passive'), this.forecastReceipt(this.forecast!, 'passive')].join('\n\n'));

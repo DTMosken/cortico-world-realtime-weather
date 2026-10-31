@@ -6,6 +6,74 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('普通逐日通知刷新已展示风力范围及最高降水概率', async () => {
+    fixture = await service();
+    await fixture.world.start(fixture.host); fixture.events.length = 0;
+    for (const part of ['daytime', 'nighttime'] as const) {
+      fixture.days[0][part].wind.scale = 4;
+      fixture.days[0][part].precipitation.probability = 0.3;
+    }
+    fixture.days[0].daytime.condition.code = '100';
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).toContain('风4级');
+    expect(fixture.events[0].text).toContain('降水30%');
+    for (const part of ['daytime', 'nighttime'] as const) {
+      fixture.days[0][part].wind.scale = 5;
+      fixture.days[0][part].precipitation.probability = 0.4;
+    }
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(1);
+    fixture.days[0].daytime.wind.scale = 6;
+    fixture.days[0].daytime.precipitation.probability = 0.6;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(2);
+    expect(fixture.events[1].text).toContain('风5–6级');
+    expect(fixture.events[1].text).toContain('降水60%');
+  });
+  it('昼夜风力互换或较低降水概率改变不影响日摘要时不通知', async () => {
+    fixture = await service();
+    fixture.days[0].daytime.wind.scale = 2;
+    fixture.days[0].nighttime.wind.scale = 5;
+    fixture.days[0].daytime.precipitation.probability = 0.9;
+    fixture.days[0].nighttime.precipitation.probability = 0.1;
+    await fixture.world.start(fixture.host); fixture.events.length = 0;
+    fixture.days[0].daytime.wind.scale = 5;
+    fixture.days[0].nighttime.wind.scale = 2;
+    fixture.days[0].nighttime.precipitation.probability = 0.5;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toEqual([]);
+  });
+  it('日摘要风力及概率全部缺失时保留累计基线', async () => {
+    fixture = await service();
+    await fixture.world.start(fixture.host); fixture.events.length = 0;
+    for (const part of ['daytime', 'nighttime'] as const) {
+      Reflect.deleteProperty(fixture.days[0][part].wind, 'scale');
+      Reflect.deleteProperty(fixture.days[0][part].precipitation, 'probability');
+    }
+    await fixture.world.pollForecast('summary');
+    const line = fixture.events[0].text!.split('\n').find(l => l.startsWith('10/31'))!;
+    expect(line).not.toContain('风'); expect(line).not.toContain('降水');
+    fixture.days[0].daytime.wind.scale = 5;
+    fixture.days[0].daytime.precipitation.probability = 0.4;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(2);
+    expect(fixture.events[1].text).toContain('风5级');
+    expect(fixture.events[1].text).toContain('降水40%');
+  });
+  it('启动摘要只有远日降温时不套今晚加被子的近期句', async () => {
+    fixture = await service();
+    fixture.current.temperature.value = 21.1;
+    fixture.hours[0].temperature.value = 20.3;
+    fixture.hours[1].temperature.value = 19.3;
+    fixture.days[1].temperatureMin.value = 10;
+    await fixture.world.start(fixture.host);
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).toContain('11/01');
+    expect(fixture.events[0].text).not.toContain('加床被子');
+    expect(fixture.events[0].text).not.toContain('接下来的温度掉得厉害');
+  });
+
   it('普通逐日通知刷新同时展示的UV及温度极值基线', async () => {
     fixture = await service();
     await fixture.world.start(fixture.host); fixture.events.length = 0;
@@ -150,8 +218,8 @@ describe('实况与预报合并', () => {
       await vi.advanceTimersByTimeAsync(1_000);
       await vi.waitFor(() => expect(fixture!.events).toHaveLength(1));
       expect(fixture.events[0].type).toBe('realtime-weather.forecast');
-      expect(fixture.events[0].text).toContain('08:59');
-      expect(fixture.events[0].text).toContain('09:59');
+      expect(fixture.events[0].text).toContain('11:59');
+      expect(fixture.events[0].text).toContain('12:59');
       expect(fixture.events[0].text).toContain('11/01');
       expect(fixture.events[0].text).not.toMatch(/PRIVATE_|42\.33|101\.12/);
       expect(fixture.counts).toMatchObject({ current: 1, alerts: 1, air: 1, hours: 2, days: 2 });
@@ -160,13 +228,13 @@ describe('实况与预报合并', () => {
       expect(fixture.events).toHaveLength(1);
     } finally { vi.useRealTimers(); }
   });
-  it('启动移除旧地点时区并用部署时区显示回执', async () => {
+  it('启动移除旧地点时区，GeoAPI时区仅在内存用于回执', async () => {
     fixture = await service('UTC');
     Object.assign(fixture.cfg.location!, { timezone: 'America/New_York' });
     await fixture.world.start(fixture.host);
     expect(fixture.cfg.location).not.toHaveProperty('timezone');
-    expect(fixture.events[0].text).toContain('06:15');
-    expect(fixture.events[0].text).toContain('07:15');
+    expect(fixture.events[0].text).toContain('17:15');
+    expect(fixture.events[0].text).toContain('18:15');
   });
 
   it('启动只投递一条实况、空气质量、预警和完整预报，并建立变化基线', async () => {
@@ -204,7 +272,7 @@ describe('实况与预报合并', () => {
     let release!: () => void;
     fixture.holds.current = new Promise<void>(resolve => { release = resolve; });
     const starting = fixture.world.start(fixture.host);
-    try { expect(lamp()).toBe('loading'); } finally { release(); await starting; }
+    try { await vi.waitFor(() => expect(lamp()).toBe('loading')); } finally { release(); await starting; }
     expect(lamp()).toBe('online');
     fixture.errors.alerts = 503;
     await fixture.world.pollCurrent();

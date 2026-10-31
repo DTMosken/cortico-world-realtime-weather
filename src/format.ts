@@ -34,14 +34,22 @@ export function currentLine(snapshot: Current, timezone: string): string {
   for (const kind of ['weather', 'air'] as const) if (snapshot.errors[kind]) parts.push(`${kind === 'weather' ? '天气' : '空气质量'}${snapshot.errors[kind]}`);
   return parts.join('｜');
 }
+export function dayMetrics(day: Day) {
+  const probabilities = [day.daytime.precipitationProbability, day.nighttime.precipitationProbability].filter((v): v is number => v !== undefined);
+  const winds = [day.daytime.windScale, day.nighttime.windScale].filter((v): v is number => v !== undefined);
+  return {
+    probability: probabilities.length ? Math.max(...probabilities) : undefined,
+    windMin: winds.length ? Math.min(...winds) : undefined,
+    windMax: winds.length ? Math.max(...winds) : undefined,
+  };
+}
 export function dayLine(day: Day): string {
   const parts = [day.date.slice(5).replace('-', '/'), `${day.daytime.condition}/${day.nighttime.condition}`];
   if (day.min !== undefined && day.max !== undefined) parts.push(`${number(day.min)}–${number(day.max)}°C`);
-  const probabilities = [day.daytime.precipitationProbability, day.nighttime.precipitationProbability].filter((v): v is number => v !== undefined);
+  const metrics = dayMetrics(day);
   const amounts = [day.daytime.precipitationAmount, day.nighttime.precipitationAmount].filter((v): v is number => v !== undefined);
-  if (probabilities.length) parts.push(`降水${Math.round(Math.max(...probabilities) * 100)}%${amounts.length === 2 ? `/${number(amounts[0] + amounts[1])} mm` : ''}`);
-  const winds = [day.daytime.windScale, day.nighttime.windScale].filter((v): v is number => v !== undefined);
-  if (winds.length) parts.push(`${day.daytime.windDirection ?? day.nighttime.windDirection ?? ''}风${Math.min(...winds)}${Math.max(...winds) === Math.min(...winds) ? '' : `–${Math.max(...winds)}`}级`);
+  if (metrics.probability !== undefined) parts.push(`降水${Math.round(metrics.probability * 100)}%${amounts.length === 2 ? `/${number(amounts[0] + amounts[1])} mm` : ''}`);
+  if (metrics.windMin !== undefined) parts.push(`${day.daytime.windDirection ?? day.nighttime.windDirection ?? ''}风${metrics.windMin}${metrics.windMax === metrics.windMin ? '' : `–${metrics.windMax}`}级`);
   if (day.uv !== undefined) parts.push(`UV最高${day.uv}`);
   return parts.join('｜');
 }
