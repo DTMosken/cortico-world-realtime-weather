@@ -212,8 +212,9 @@ export class RealtimeWeatherWorld implements World {
           if (Math.abs(day[key]! - old[key]!) >= this.ctx.cfg.temperatureChange) { changed = true; dayChanges.push({ id: day[key]! > old[key]! ? 'temperatureUp' : 'temperatureDown', text: '' }); }
           else baseline[key] = old[key];
         }
-        if (old.uv !== undefined && day.uv !== undefined && Math.floor(old.uv) !== Math.floor(day.uv)) {
+        if (old.uv !== undefined && day.uv !== undefined) {
           const uvChanges = weatherChanges({ ...old.daytime, uv: old.uv }, { ...day.daytime, uv: day.uv }, this.ctx.cfg);
+          baseline.uv = uvChanges.baseline.uv;
           changed ||= uvChanges.changes.some(c => c.id === 'uvUp' || c.id === 'uvDown');
         }
       }

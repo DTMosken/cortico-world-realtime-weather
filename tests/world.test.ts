@@ -6,6 +6,19 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('逐小时和逐日UV修订累计达到3才通知', async () => {
+    fixture = await service();
+    await fixture.world.start(fixture.host); fixture.events.length = 0;
+    for (const delta of [1, 2, 3]) {
+      fixture.hours[0].uvIndex = 2 + delta;
+      fixture.days[0].uvIndexMax = 4 + delta;
+      await fixture.world.pollForecast();
+      expect(fixture.events).toHaveLength(delta === 3 ? 1 : 0);
+    }
+    expect(fixture.events[0].text).toContain('UV 2→5');
+    expect(fixture.events[0].text).toContain('UV最高7');
+  });
+
   it('每日按部署时区08:00投递完整预报，即使预测没有修订', async () => {
     fixture = await service('Asia/Shanghai');
     fixture.now = Date.parse('2026-10-30T23:59:00Z');

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Ambience } from '../src/ambience.ts';
+import defaults from '../src/ambience.default.json' with { type: 'json' };
 
 const directories: string[] = [];
 afterEach(() => { for (const dir of directories.splice(0)) rmSync(dir, { recursive: true, force: true }); });
@@ -94,6 +95,7 @@ describe('demo文案与部署覆盖', () => {
     const copy = new Ambience(file, () => 0.999);
     expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvUp', 'highUv', 'daylight'])).toContain('格外毒辣');
     expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvDown', 'lowUv', 'daylight'])).toContain('光线变得柔和舒适');
-    expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvDown', 'daylight'])).toContain('伸手拉开窗帘');
+    const ordinary = defaults.rules.find(r => r.id === 'body-current-uvDown-lowUv-daylight-1')!;
+    expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvDown', 'daylight'])).toContain(ordinary.texts.at(-1)!);
   });
 });

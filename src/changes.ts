@@ -1,5 +1,5 @@
 import type { RealtimeWeatherConfigSection } from './config.ts';
-import { alertGrade, conditionCode, weatherTags, uvLevel, type Alert, type Change, type Weather } from './model.ts';
+import { alertGrade, conditionCode, weatherTags, type Alert, type Change, type Weather } from './model.ts';
 import { clock } from './time.ts';
 
 export function precipitationRank(w: Weather): number | undefined {
@@ -55,6 +55,7 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     }
   }
   for (const [key, threshold, unit, label, up, down] of [
+    ['uv', 3, '', 'UV ', 'uvUp', 'uvDown'],
     ['temperature', cfg.temperatureChange, '°C', '温度', 'temperatureUp', 'temperatureDown'],
     ['feelsLike', cfg.temperatureChange, '°C', '体感', 'feelsLikeUp', 'feelsLikeDown'],
     ['windScale', cfg.windScaleChange, '级', '风力', 'windUp', 'windDown'],
@@ -69,7 +70,6 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     } else baseline[key] = previous;
   }
   if (before.visibilityKm !== undefined && current.visibilityKm !== undefined && (before.visibilityKm < cfg.visibilityThresholdKm) !== (current.visibilityKm < cfg.visibilityThresholdKm)) add(current.visibilityKm < cfg.visibilityThresholdKm ? 'visibilityDown' : 'visibilityUp', `能见度${before.visibilityKm}→${current.visibilityKm} km`);
-  if (before.uv !== undefined && current.uv !== undefined && uvLevel(before.uv) !== uvLevel(current.uv)) add(current.uv > before.uv ? 'uvUp' : 'uvDown', `UV ${before.uv}→${current.uv}`);
   return { changes, baseline };
 }
 

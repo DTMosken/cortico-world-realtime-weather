@@ -4,6 +4,20 @@ import { REALTIME_WEATHER_DEFAULTS } from '../src/config.ts';
 import type { Alert, Weather } from '../src/model.ts';
 const base: Weather = { conditionCode: '100', condition: '晴', temperature: 22, feelsLike: 22, precipitationType: 'none', visibilityKm: 8, uv: 2, windScale: 2 };
 describe('双向变化', () => {
+  it.each([[2, 3], [3, 5], [6, 7], [3, 2]])('UV %s到%s的小幅变化不通知', (before, after) => {
+    expect(weatherChanges({ ...base, uv: before }, { ...base, uv: after }, REALTIME_WEATHER_DEFAULTS).changes).toEqual([]);
+  });
+  it('UV基线跨轮保留，达到3后更新，其他天气变化不重置它', () => {
+    let baseline = base;
+    const emitted: string[] = [];
+    for (const uv of [3, 2, 4, 5, 4, 3, 2]) {
+      const result = weatherChanges(baseline, { ...base, uv, temperature: 30 }, REALTIME_WEATHER_DEFAULTS);
+      emitted.push(...result.changes.filter(c => c.id.startsWith('uv')).map(c => c.text));
+      baseline = result.baseline;
+    }
+    expect(emitted).toEqual(['UV 2→5', 'UV 5→2']);
+  });
+
   it.each([
     ['ice', '999', 'precipitationStopped'], ['rain', '313', 'precipitationStopped'],
     ['unknown', '999', 'precipitationUpdated'], ['rain', '305', 'rainStopped'],
