@@ -10,12 +10,25 @@ export function dateKey(at: string | number | Date, timezone: string): string {
 export function period(at: string | number | Date, timezone: string, location?: Location): string {
   const [hour, minute] = clock(at, timezone).split(':').map(Number);
   const minutes = hour * 60 + minute;
-  if (location && minutes >= 480) {
+  if (location) {
     const now = new Date(at).getTime();
     const times = solarTimes(now, location, timezone);
-    if (times.alwaysUp || times.sunset && now < times.sunset.getTime()) return 'day';
-    if (times.sunset && times.dusk && now >= times.sunset.getTime() && now < times.dusk.getTime()) return 'evening';
-    return minutes < 1410 ? 'night' : 'lateNight';
+    if (times.sunrise && times.sunset) {
+      if (now < times.sunrise.getTime()) {
+        // 上一日的日间与暮色可能延续到午夜后；以正午回推24小时取上一日，避开夏令时错位。
+        const previous = solarTimes(times.solarNoon.getTime() - 24 * 60 * 60_000, location, timezone);
+        if (previous.sunset && now < previous.sunset.getTime()) return 'day';
+        if (previous.dusk && now < previous.dusk.getTime()) return 'evening';
+        return minutes >= 300 || times.dawn && now >= times.dawn.getTime() ? 'morning' : 'lateNight';
+      }
+      if (now < times.sunset.getTime()) return 'day';
+      // 白夜没有民用暮光结束，日落至23:30为傍晚。
+      if (!times.dusk) return minutes < 1410 ? 'evening' : 'lateNight';
+      if (now < times.dusk.getTime()) return 'evening';
+      return minutes < 1410 ? 'night' : 'lateNight';
+    }
+    // 极昼极夜没有日出日落，08:00前沿用固定时段。
+    if (minutes >= 480) return times.alwaysUp ? 'day' : minutes < 1410 ? 'night' : 'lateNight';
   }
   return minutes >= 300 && minutes < 480 ? 'morning' : minutes >= 480 && minutes < 1020 ? 'day' : minutes >= 1020 && minutes < 1170 ? 'evening' : minutes >= 1170 && minutes < 1410 ? 'night' : 'lateNight';
 }

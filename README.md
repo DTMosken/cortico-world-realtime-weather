@@ -27,7 +27,7 @@ Cortico World扩展，使用QWeather获取天气、空气质量、官方预警�
 
 实况时间表示查询时间；预报行时间是预报有效时刻。失败时保留最近成功数据并标明沿用时间，主动工具可立即重试。内部使用UTC；回执时间、氛围时段与日出日落采用地点当地时间，每日08:00预报调度采用已保存的地点时区。地点时区在选择城市时随地点保存，取自城市搜索结果，不随部署机器的时区变化；部署时区默认跟随系统。选择城市时不保存Location ID；v0.1.0配置中已有的编号不再使用，重新选择城市后移除。地点配置缺少时区时不启动查询，配置页、状态灯和工具提示重新选择城市，不退回部署时区。逐日预报保留接口返回的天气地点日历日期。缺失字段不当作零，也不清除累计变化基线。
 
-启动摘要在实际投递时使用最新轮询缓存生成，各项数据保留查询时间。氛围起手的暮色时段采用地点日落至民用暮光结束；日落前仍采用日间文案。
+启动摘要在实际投递时使用最新轮询缓存生成，各项数据保留查询时间。氛围起手的日间时段采用地点日出至日落，清晨至日出为止，暮色时段采用日落至民用暮光结束；跨午夜延续的日间与暮色时段按上一日日落与民用暮光结束。
 
 ## 文案文件
 
@@ -49,7 +49,7 @@ JSON契约见`src/ambience.schema.json`。`rules`中的`part`为`opening`（起�
 可用于补充词库的标签：
 
 - 查询：`current`、`forecast`、`active`、`passive`。
-- 当地时段：05:00–08:00为`morning`，05:00前为`lateNight`；08:00以后按地点计算，日落前为`day`，日落至民用暮光结束为`evening`，之后至23:30为`night`，再后为`lateNight`。极昼的08:00以后使用`day`，极夜不使用`evening`。`daylight`/`dark`按太阳位置判断。
+- 当地时段按地点计算：民用晨光开始与05:00中较早者至日出为`morning`，日出至日落为`day`，日落至民用暮光结束为`evening`，之后至23:30为`night`，再后至清晨为`lateNight`。白夜没有民用暮光结束时，日落至23:30为`evening`，之后为`lateNight`。跨午夜延续的`day`与`evening`按上一日日落与民用暮光结束。极昼极夜没有日出日落，08:00前沿用固定时段（05:00–08:00为`morning`，05:00前为`lateNight`），08:00以后极昼使用`day`，极夜使用`night`/`lateNight`。`daylight`/`dark`按太阳位置判断。
 - 静态天气：`clear`、`cloudy`、`lightRain`、`heavyRain`、`lightSnow`、`heavySnow`、`mixed`、`thunder`、`fog`、`polluted`、`windy`、`freezing`、`hot`、`humidHot`。
 - 变化：`becameClear`、`becameCloudy`、`conditionChanged`、`rainStarted`、`rainStopped`、`rainStronger`、`rainWeaker`、`snowStarted`、`snowStopped`、`snowStronger`、`snowWeaker`、`rainToSnow`、`snowToRain`、`precipitationChanged`、`temperatureUp/Down`、`feelsLikeUp/Down`、`windUp/Down`、`visibilityUp/Down`、`uvUp/Down`、`airUp/Down`、`probabilityUp/Down`。`Up/Down`各为独立标签。被动事件只向文案提供本轮变化标签。
 - UV补充条件：`highUv` ≥7、`lowUv` ≤2。空气改善补充条件`clearerAir`表示当前AQI达到对应标准的良好类别，且能见度高于本段污染开始时；中间改善轮次不前移该基线。
