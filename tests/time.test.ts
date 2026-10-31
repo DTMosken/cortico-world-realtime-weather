@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { clock, dateKey, isDaylight, solarTimes, nextDailyForecastAt } from '../src/time.ts';
 import type { Location } from '../src/config.ts';
-const location: Location = { id: 'sample', name: 'Example', country: 'Example', province: '', city: '', latitude: -34, longitude: 151 };
+const location: Location = { name: 'Example', country: 'Example', province: '', city: '', latitude: -34, longitude: 151, timezone: 'Australia/Sydney' };
 describe('部署时区与天文', () => {
   it.each([
     ['2026-10-30T20:59:00Z', 'Australia/Sydney', '2026-10-30T21:00:00Z'],

@@ -6,10 +6,10 @@ import type { ToolDef, World, WorldHost, WorldWebUiDecl } from 'cortico/core/typ
 import type { WorldContext } from 'cortico/world.ts';
 import { nowIso } from 'cortico/core/util.ts';
 import type { Language } from 'cortico/core/language.ts';
-import { REALTIME_WEATHER_SECRET, realtimeWeatherConfigGroup, type Location, type RealtimeWeatherConfigSection } from './config.ts';
-import { apiBase, QWeather } from './qweather.ts';
+import { REALTIME_WEATHER_SECRET, realtimeWeatherConfigGroup, type CityCandidate, type RealtimeWeatherConfigSection } from './config.ts';
+import { apiBase, LOCATION_TIMEZONE_MISSING, QWeather, QWeatherError } from './qweather.ts';
 import { Ambience } from './ambience.ts';
-import { alertChanges, weatherChanges } from './changes.ts';
+import { alertChanges, UV_CHANGE, weatherChanges } from './changes.ts';
 import { clock, isDaylight, solarTimes, nextDailyForecastAt } from './time.ts';
 import { forecastTags, type ForecastSelection } from './forecast.ts';
 import { airStandard, currentLine, dayLine, dayMetrics, forecastLines } from './format.ts';
@@ -33,8 +33,7 @@ export interface RealtimeWeatherWorldOptions {
   random?: () => number;
 }
 function errorText(error: unknown): string {
-  const message = error instanceof Error ? error.message : '';
-  return /^(QWeather (HTTP \d{3}|请求未完成|响应格式错误)|密钥未配置|尚未选择城市或区划|空气质量暂无数据|地点时区查询失败|API Host 须为)/.test(message) ? message : '响应处理失败';
+  return error instanceof QWeatherError ? error.message : '响应处理失败';
 }
 
 export class RealtimeWeatherWorld implements World {
@@ -42,8 +41,6 @@ export class RealtimeWeatherWorld implements World {
   readonly client: QWeather;
   readonly ambience: Ambience;
   private host?: WorldHost;
-  private locationTimezone?: string;
-  private timezoneError?: string;
   private controller = new AbortController();
   private timers = new Set<ReturnType<typeof setTimeout>>();
   private tasks = new Set<Promise<unknown>>();
@@ -57,9 +54,10 @@ export class RealtimeWeatherWorld implements World {
   private previous?: Current;
   private previousForecast?: Forecast;
   private cycle = 0;
+  private initialized = false;
   private airVisibilityBaseline?: number;
   private airHazeBaseline = false;
-  private candidates: Location[] = [];
+  private candidates: CityCandidate[] = [];
   private readonly now: () => number;
   private readonly open: (file: string) => Promise<void>;
 
@@ -72,7 +70,6 @@ export class RealtimeWeatherWorld implements World {
   envPromptVars(): Record<string, string> { return {}; }
   tools(): ToolDef[] {
     return REALTIME_WEATHER_TOOL_DECLS.map((decl, index) => ({ ...decl, handler: async () => {
-      if (this.timezoneError) return `地点时区查询失败：${this.timezoneError}`;
       if (index === 0) {
         const current = this.current && !Object.keys(this.current.errors).length && this.now() - Date.parse(this.current.at) < REALTIME_WEATHER_CURRENT_INTERVAL_MS ? this.current : await this.loadCurrent(!this.current?.air || !!this.current.errors.air);
         return this.currentReceipt(current, 'active');
@@ -81,7 +78,8 @@ export class RealtimeWeatherWorld implements World {
       return this.forecastReceipt(forecast, 'active');
     } }));
   }
-  private timezone(): string { return this.locationTimezone ?? this.ctx.timezone; }
+  private timezone(): string { return this.ctx.cfg.location?.timezone ?? this.ctx.timezone; }
+  private locationError(): string | undefined { return this.ctx.cfg.location && !this.ctx.cfg.location.timezone ? LOCATION_TIMEZONE_MISSING : undefined; }
   private tags(weather?: Weather): string[] {
     return [...(weather ? weatherTags(weather) : []), ...(this.ctx.cfg.location && isDaylight(this.now(), this.ctx.cfg.location) ? ['daylight'] : ['dark']), ...((weather?.windScale ?? 0) < 4 ? ['calm'] : []), ...(weather && (weatherTags(weather).some(tag => ['cloudy', 'fog'].includes(tag)) || ['rain', 'snow', 'mixed'].includes(weather.precipitationType ?? '')) ? ['cloudyOrWet'] : [])];
   }
@@ -181,11 +179,11 @@ export class RealtimeWeatherWorld implements World {
       this.airHazeBaseline = !!current.weather && weatherTags(current.weather).includes('haze');
     }
     this.previous = current;
-    if (notify && receipt && host && this.host === host && !this.controller.signal.aborted) await this.push('realtime-weather.changed', receipt);
+    if (notify && receipt && host && this.host === host) await this.push('realtime-weather.changed', receipt);
   }
   pollForecast(mode: ForecastPollMode = 'changes'): Promise<void> {
     if (this.forecastPoll) {
-      if (mode === 'summary' || this.forecastPoll.mode === 'silent') this.forecastPoll.mode = mode;
+      if (mode === 'summary') this.forecastPoll.mode = mode;
       return this.forecastPoll.promise;
     }
     const poll: ForecastPoll = { mode, promise: Promise.resolve() };
@@ -222,7 +220,7 @@ export class RealtimeWeatherWorld implements World {
       const dayChanges: Change[] = [];
       const baseline: Day = { ...day };
       let changed = false;
-      if (old && !current.errors.days) {
+      if (old) {
         for (const part of ['daytime', 'nighttime'] as const) {
           const result = weatherChanges(
             { ...old[part], windScale: undefined, precipitationProbability: undefined },
@@ -252,10 +250,10 @@ export class RealtimeWeatherWorld implements World {
           if (Math.abs(day[key]! - old[key]!) >= this.ctx.cfg.temperatureChange) { changed = true; dayChanges.push({ id: day[key]! > old[key]! ? 'temperatureUp' : 'temperatureDown', text: '' }); }
           else if (mode !== 'summary') baseline[key] = old[key];
         }
-        {
-          const uvChanges = weatherChanges({ ...old.daytime, uv: old.uv }, { ...day.daytime, uv: day.uv }, this.ctx.cfg, mode === 'summary');
-          baseline.uv = uvChanges.baseline.uv;
-          changed ||= uvChanges.changes.some(c => c.id === 'uvUp' || c.id === 'uvDown');
+        if (day.uv === undefined) baseline.uv = old.uv;
+        else if (old.uv !== undefined) {
+          if (Math.abs(day.uv - old.uv) >= UV_CHANGE) changed = true;
+          else if (mode !== 'summary') baseline.uv = old.uv;
         }
       }
       if (mode === 'summary' || changed) {
@@ -272,19 +270,18 @@ export class RealtimeWeatherWorld implements World {
       next.days.push(baseline);
     }
     this.previousForecast = next;
-    if (mode !== 'silent' && (mode === 'summary' || changes.length) && host && this.host === host && !this.controller.signal.aborted) {
+    if (mode !== 'silent' && (mode === 'summary' || changes.length) && host && this.host === host) {
       await this.push('realtime-weather.forecast', mode === 'summary' ? this.forecastReceipt(current, 'passive') : this.forecastReceipt(current, 'passive', changes, selection));
     }
   }
   private async push(type: string, text: string): Promise<void> {
     await this.host!.pushEvent({ type, source: this.id, senderKey: this.id, origin: 'external', ts: nowIso(this.ctx.timezone), text });
   }
-  private schedule(run: () => Promise<void | boolean>, interval: number): void {
+  private schedule(run: () => Promise<void>, interval: number): void {
     const timer = setTimeout(() => {
       this.timers.delete(timer);
       if (!this.host) return;
-      let repeat = true;
-      const task = run().then(result => { repeat = result !== false; }).catch(() => { this.host?.log.warn('天气轮询未完成'); }).finally(() => { this.tasks.delete(task); if (repeat && this.host) this.schedule(run, interval); });
+      const task = run().catch(() => { this.host?.log.warn('天气轮询未完成'); }).finally(() => { this.tasks.delete(task); if (this.host) this.schedule(run, interval); });
       this.tasks.add(task);
     }, interval);
     timer.unref(); this.timers.add(timer);
@@ -317,7 +314,9 @@ export class RealtimeWeatherWorld implements World {
         if (next) {
           const at = new Date(this.now()).toISOString();
           const atmosphere = this.ambience.render(next.kind, 'passive', at, this.timezone(), this.tags(this.current?.weather));
-          await this.push('realtime-weather.solar', [`${clock(at, this.timezone())}｜${next.kind === 'sunrise' ? '日出' : '日落'}${this.current?.weather ? `｜${this.current.weather.condition}` : ''}`, atmosphere].filter(Boolean).join('\n\n'));
+          const current = this.current;
+          const stale = current?.errors.weather && current.weatherAt ? `（沿用${clock(current.weatherAt, this.timezone())}）` : '';
+          await this.push('realtime-weather.solar', [`${clock(at, this.timezone())}｜${next.kind === 'sunrise' ? '日出' : '日落'}${current?.weather ? `｜${current.weather.condition}${stale}` : ''}`, atmosphere].filter(Boolean).join('\n\n'));
         }
       };
       const task = run().catch(() => { this.host?.log.warn('日出日落事件未完成'); }).finally(() => { this.tasks.delete(task); if (this.host) this.scheduleSolar(); });
@@ -325,21 +324,9 @@ export class RealtimeWeatherWorld implements World {
     }, delay);
     timer.unref(); this.timers.add(timer);
   }
-  private async loadTimezone(): Promise<boolean> {
-    try {
-      this.locationTimezone = await this.client.timezone(this.host ? this.controller.signal : undefined);
-      this.timezoneError = undefined;
-      return true;
-    } catch (error) {
-      this.timezoneError = errorText(error);
-      return false;
-    }
-  }
-  private async initialize(host: WorldHost): Promise<boolean> {
-    if (!await this.loadTimezone()) return false;
-    if (this.host !== host || this.controller.signal.aborted) return true;
+  private async initialize(host: WorldHost): Promise<void> {
     await Promise.all([this.pollCurrent(false), this.pollForecast('silent')]);
-    if (this.host !== host || this.controller.signal.aborted) return true;
+    if (this.host !== host) return;
     const summary = [this.currentReceipt(this.current!, 'passive'), this.forecastReceipt(this.forecast!, 'passive')].join('\n\n');
     // Temporary workaround: startup replay can requeue an already queued persisted event.
     host.pushDeferred({
@@ -350,22 +337,17 @@ export class RealtimeWeatherWorld implements World {
     this.schedule(() => this.pollForecast(), REALTIME_WEATHER_FORECAST_INTERVAL_MS);
     this.scheduleSolar();
     this.scheduleDailyForecast();
-    return true;
+    this.initialized = true;
   }
   async start(host: WorldHost): Promise<void> {
-    if (this.ctx.cfg.location && 'timezone' in this.ctx.cfg.location) {
-      const { timezone: _timezone, ...location } = this.ctx.cfg.location;
-      this.ctx.persist({ location: null });
-      this.ctx.persist({ location });
-    }
     this.host = host; this.controller = new AbortController(); this.ambience.start();
-    if (!this.ctx.cfg.location || !this.ctx.cfg.apiHost || !this.ctx.secret(REALTIME_WEATHER_SECRET)) return;
-    if (!await this.initialize(host) && this.host === host && !this.controller.signal.aborted) {
-      this.schedule(async () => !await this.initialize(host), REALTIME_WEATHER_CURRENT_INTERVAL_MS);
-    }
+    if (!this.ctx.cfg.location || this.locationError() || !this.ctx.cfg.apiHost || !this.ctx.secret(REALTIME_WEATHER_SECRET)) return;
+    // Core awaits each World's start in turn; queries run in the background so a slow API cannot hold up the bot.
+    const task = this.initialize(host).catch(() => { this.host?.log.warn('天气初始化未完成'); }).finally(() => { this.tasks.delete(task); });
+    this.tasks.add(task);
   }
   async stop(): Promise<void> {
-    this.host = undefined; this.controller.abort();
+    this.host = undefined; this.initialized = false; this.controller.abort();
     for (const timer of this.timers) clearTimeout(timer);
     this.timers.clear(); this.ambience.stop();
     await Promise.allSettled([...this.tasks]);
@@ -373,10 +355,10 @@ export class RealtimeWeatherWorld implements World {
 
   webUi(language?: Language): WorldWebUiDecl {
     const loading = !!this.currentFlight || !!this.forecastFlight || !!this.airFlight;
-    const failed = !!this.timezoneError || Object.keys({ ...this.current?.errors, ...this.forecast?.errors }).length > 0;
+    const failed = !!this.locationError() || Object.keys({ ...this.current?.errors, ...this.forecast?.errors }).length > 0;
     const state = loading ? 'loading' : failed ? 'error' : this.current && this.forecast ? 'online' : 'offline';
     return {
-      lamps: [{ label: 'QWeather', state, hint: state === 'online' ? '最近一次天气与预报查询成功' : state === 'error' ? '最近一次查询有接口失败' : state === 'loading' ? '正在查询天气' : '尚未完成天气与预报查询' }],
+      lamps: [{ label: 'QWeather', state, hint: state === 'online' ? '最近一次天气与预报查询成功' : state === 'error' ? this.locationError() ?? '最近一次查询有接口失败' : state === 'loading' ? '正在查询天气' : '尚未完成天气与预报查询' }],
       label: '实时天气',
       badges: [{ label: 'QWeather', value: this.ctx.secret(REALTIME_WEATHER_SECRET) ? '密钥已配置' : '密钥未配置' }, { label: '地点', value: this.ctx.cfg.location?.name ?? '未选择' }],
       panels: [{ id: 'config', title: '配置' }],
@@ -384,8 +366,9 @@ export class RealtimeWeatherWorld implements World {
       invoke: async (panel, method, args) => {
         if (panel !== 'config') throw new Error('未知面板');
         if (method === 'state') {
-          this.ambience.reload();
-          return { config: this.ctx.cfg, keySet: !!this.ctx.secret(REALTIME_WEATHER_SECRET), ambience: { file: this.ambience.file, usingDefault: this.ambience.usingDefault, error: this.ambience.error }, errors: { ...this.current?.errors, ...this.forecast?.errors, ...(this.timezoneError ? { timezone: this.timezoneError } : {}) }, alerts: this.client.rawAlerts, attributions: [...this.client.attributions] };
+          // Stopped worlds have no file watcher; the panel stays reachable while stopped.
+          if (!this.host) this.ambience.reload();
+          return { config: this.ctx.cfg, keySet: !!this.ctx.secret(REALTIME_WEATHER_SECRET), ambience: { file: this.ambience.file, usingDefault: this.ambience.usingDefault, error: this.ambience.error }, errors: { ...this.current?.errors, ...this.forecast?.errors, ...(this.locationError() ? { location: this.locationError() } : {}) }, alerts: this.client.rawAlerts, attributions: [...this.client.attributions] };
         }
         if (method === 'save') {
           const [key, raw] = args;
@@ -408,16 +391,20 @@ export class RealtimeWeatherWorld implements World {
         if (method === 'selectCity') {
           const selected = this.candidates.find(c => c.id === args[0]);
           if (!selected) throw new Error('请从本次搜索结果选择地点');
-          this.ctx.persist({ location: selected }); await this.ctx.restart(); return { ok: true };
+          const { id: _id, ...location } = selected;
+          // persist合并对象；先置空，避免旧地点的多余字段（如编号）留在配置中。
+          this.ctx.persist({ location: null });
+          this.ctx.persist({ location }); await this.ctx.restart(); return { ok: true };
         }
         if (method === 'openKeyFile') { await this.open(prepareKeyFile(this.ctx.botDir)); return { ok: true }; }
         if (method === 'openAmbience') { ensureParent(this.ambience.file); this.ambience.ensureFile(); await this.open(this.ambience.file); return { ok: true }; }
         if (method === 'restoreAmbience') { ensureParent(this.ambience.file); this.ambience.restore(); return { ok: true }; }
         if (method === 'testConnection') {
           const start = this.now();
-          const [current, forecast] = await Promise.all([this.loadCurrent(true), this.loadForecast(), this.loadTimezone()]);
-          const result = { durationMs: this.now() - start, errors: { ...current.errors, ...forecast.errors, ...(this.timezoneError ? { timezone: this.timezoneError } : {}) } };
-          if (current.weather && !this.timezoneError) await this.ctx.restart();
+          const [current, forecast] = await Promise.all([this.loadCurrent(true), this.loadForecast()]);
+          const result = { durationMs: this.now() - start, errors: { ...current.errors, ...forecast.errors } };
+          // Restart only to bring up a World that has not initialized; a stale cached reading is not success.
+          if (!current.errors.weather && !this.initialized) await this.ctx.restart();
           return result;
         }
         if (method === 'restart') { await this.ctx.restart(); return { ok: true }; }

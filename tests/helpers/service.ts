@@ -39,7 +39,7 @@ export async function service(timezone = 'Australia/Sydney', deferEvents = false
     return fetch(`http://127.0.0.1:${address.port}${url.pathname}${url.search}`, init);
   };
   const botDir = mkdtempSync(join(tmpdir(), 'weather-extension-'));
-  const cfg: RealtimeWeatherConfigSection = { ...REALTIME_WEATHER_DEFAULTS, apiHost: 'example.qweatherapi.com', location: { id: 'example-city', name: 'PRIVATE_LOCATION', country: 'Example', province: 'North', city: 'District', latitude: 42.33, longitude: 101.12 } };
+  const cfg: RealtimeWeatherConfigSection = { ...REALTIME_WEATHER_DEFAULTS, apiHost: 'example.qweatherapi.com', location: { name: 'PRIVATE_LOCATION', country: 'Example', province: 'North', city: 'District', latitude: 42.33, longitude: 101.12, timezone: 'Australia/Sydney' } };
   let restarts = 0;
   const context: WorldContext<RealtimeWeatherConfigSection> = { id: 'realtime-weather', cfg, timezone, botName: 'example', botDir, dataDir: botDir, repoRoot: botDir, packageDir: botDir, secret: () => 'PRIVATE_KEY', storeSecret: () => {}, persist: patch => { Object.assign(cfg, patch); }, restart: async () => { restarts++; } };
   const events: EventEnvelope[] = [];
@@ -60,6 +60,11 @@ export async function service(timezone = 'Australia/Sydney', deferEvents = false
   } as unknown as WorldHost;
   const world = new RealtimeWeatherWorld(context, { request, now: () => now, openFile: async () => {}, random: () => 0 });
   return { world, host, events, cfg, context, request, counts, errors, holds, headerKeys, botDir,
+    /** start() returns before the background queries; wait for them like a running bot would observe. */
+    async start() {
+      await world.start(host);
+      await Promise.allSettled([...(world as unknown as { tasks: Set<Promise<unknown>> }).tasks]);
+    },
     async flushDeferred() { for (const spec of deferred.splice(0)) await materialize(spec); },
     get now() { return now; }, set now(value: number) { now = value; },
     get current() { return current; }, set current(value) { current = value; },

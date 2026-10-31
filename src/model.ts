@@ -29,16 +29,12 @@ export interface Air {
   level: number;
   category: string;
   primary?: string;
-  pm25?: number;
 }
 export interface Alert {
   id: string;
   event: string;
   severity: string;
   color?: string;
-  urgency?: string;
-  certainty?: string;
-  issuedAt?: string;
   effectiveAt?: string;
   onsetAt?: string;
   expiresAt?: string;

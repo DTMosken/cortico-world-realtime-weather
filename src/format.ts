@@ -30,8 +30,9 @@ export function currentLine(snapshot: Current, timezone: string): string {
     parts.push(`AQI(${standard}) ${air.value}（${air.category}，${clock(air.at, timezone)}）${air.primary ? `，首要${air.primary}` : ''}`);
   } else parts.push('空气质量暂无数据');
   const alerts = activeAlerts(snapshot.alerts, Date.parse(snapshot.at));
-  parts.push(snapshot.errors.alerts ? `预警${snapshot.errors.alerts}` : alerts.length ? alerts.map(a => alertLine(a, timezone)).join('；') : '无有效预警');
-  for (const kind of ['weather', 'air'] as const) if (snapshot.errors[kind]) parts.push(`${kind === 'weather' ? '天气' : '空气质量'}${snapshot.errors[kind]}`);
+  if (snapshot.errors.alerts && !snapshot.alertsAt) parts.push('预警暂无数据');
+  else parts.push((alerts.length ? alerts.map(a => alertLine(a, timezone)).join('；') : '无有效预警') + (snapshot.errors.alerts ? `（沿用${clock(snapshot.alertsAt!, timezone)}）` : ''));
+  for (const kind of ['weather', 'alerts', 'air'] as const) if (snapshot.errors[kind]) parts.push(`${{ weather: '天气', alerts: '预警', air: '空气质量' }[kind]}${snapshot.errors[kind]}`);
   return parts.join('｜');
 }
 export function dayMetrics(day: Day) {

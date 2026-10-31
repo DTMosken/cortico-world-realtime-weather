@@ -2,14 +2,17 @@ import type { ConfigGroup } from 'cortico/core/types.ts';
 import type { Language } from 'cortico/core/language.ts';
 
 export interface Location {
-  id: string;
   name: string;
   country: string;
   province: string;
   city: string;
   latitude: number;
   longitude: number;
+  /** 天气地点的IANA时区，选择城市时取自GeoAPI。 */
+  timezone: string;
 }
+/** 城市搜索结果；id仅用于本次选择，不写入配置。 */
+export interface CityCandidate extends Location { id: string }
 
 export interface RealtimeWeatherConfigSection {
   enabled: boolean;

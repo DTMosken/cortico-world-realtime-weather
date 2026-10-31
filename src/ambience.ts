@@ -32,6 +32,7 @@ export class Ambience {
   start(): void {
     if (this.watching) return;
     this.watching = true;
+    this.reload();
     watchFile(this.file, { interval: 1000, persistent: false }, () => this.reload());
   }
   stop(): void { if (this.watching) unwatchFile(this.file); this.watching = false; }
@@ -58,7 +59,7 @@ export class Ambience {
       const alertType = alertBody.when.map(tag => alertTypes[tag]).find(Boolean) ?? '气象';
       const openingTags = new Set([...alertTags].filter(t => t !== kind));
       openingTags.add('forecast');
-      alertText = `${this.select('opening', openingTags)?.text ?? ''}${alertBody.text.replace(/\{alertType\}|\[(台风\/暴雨\/雷电\/大风|暴雨\/大风\/高温|暴雨\/大风\/暴雪)\]/g, alertType)}`;
+      alertText = `${this.select('opening', openingTags)?.text ?? ''}${alertBody.text.replace(/\{alertType\}/g, alertType)}`;
     }
     const text = weatherText + alertText;
     return text ? `[${text}]` : '';
