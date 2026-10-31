@@ -32,6 +32,8 @@ export interface RealtimeWeatherWorldOptions {
   openFile?: (file: string) => Promise<void>;
   random?: () => number;
 }
+/** 多云、阴及其夜间代码。 */
+const THICK_CLOUD = ['101', '104', '151'];
 function errorText(error: unknown): string {
   return error instanceof QWeatherError ? error.message : '响应处理失败';
 }
@@ -81,12 +83,12 @@ export class RealtimeWeatherWorld implements World {
   private timezone(): string { return this.ctx.cfg.location?.timezone ?? this.ctx.timezone; }
   private locationError(): string | undefined { return this.ctx.cfg.location && !this.ctx.cfg.location.timezone ? LOCATION_TIMEZONE_MISSING : undefined; }
   private tags(weather?: Weather): string[] {
-    return [...(weather ? weatherTags(weather) : []), ...(this.ctx.cfg.location && isDaylight(this.now(), this.ctx.cfg.location) ? ['daylight'] : ['dark']), ...((weather?.windScale ?? 0) < 4 ? ['calm'] : []), ...(weather && (weatherTags(weather).some(tag => ['cloudy', 'fog'].includes(tag)) || ['rain', 'snow', 'mixed'].includes(weather.precipitationType ?? '')) ? ['cloudyOrWet'] : [])];
+    return [...(weather ? weatherTags(weather) : []), ...(this.ctx.cfg.location && isDaylight(this.now(), this.ctx.cfg.location) ? ['daylight'] : ['dark']), ...((weather?.windScale ?? 0) < 4 ? ['calm'] : []), ...(weather && (THICK_CLOUD.includes(weather.conditionCode) || weatherTags(weather).includes('fog') || ['rain', 'snow', 'mixed'].includes(weather.precipitationType ?? '')) ? ['cloudyOrWet'] : [])];
   }
   private currentReceipt(current: Current, trigger: 'active' | 'passive', changes?: Change[]): string {
     const weather = current.errors.weather ? undefined : current.weather;
     const tags = changes ? ['current', ...changes.map(c => c.id), ...this.tags(weather).filter(t => ['daylight', 'dark', 'calm', 'cloudyOrWet'].includes(t))] : ['current', ...this.tags(weather)];
-    const thickCloud = weather && ['101', '104', '151', '154'].includes(weather.conditionCode);
+    const thickCloud = weather && THICK_CLOUD.includes(weather.conditionCode);
     if (thickCloud) tags.push('thickCloud');
     if (changes?.some(c => c.id === 'becameCloudy') && !thickCloud && tags.includes('dark')) tags.push('conditionChanged');
     if (weather?.uv !== undefined) { if (weather.uv >= 7) tags.push('highUv'); if (weather.uv <= 2) tags.push('lowUv'); }

@@ -10,7 +10,7 @@ import { RealtimeWeatherWorld } from '../../src/world.ts';
 export function weather(overrides: Record<string, unknown> = {}) {
   return { condition: { code: '104', text: 'PRIVATE_LOCATION' }, temperature: { value: 22, unit: '°C' }, feelsLike: { value: 24 }, wind: { direction: { compass: 'e' }, scale: 3 }, precipitation: { type: 'none', intensity: { value: 0 }, probability: 0.1, amount: { value: 0 } }, visibility: { value: 8000 }, uvIndex: 2, ...overrides };
 }
-export async function service(timezone = 'Australia/Sydney', deferEvents = false) {
+export async function service(timezone = 'Australia/Sydney', deferEvents = false, random = () => 0) {
   let now = Date.parse('2026-10-31T06:15:00Z');
   let current = weather();
   let hours = [1, 2, 3].map(offset => ({ ...weather(), forecastTime: new Date(now + offset * 3600000).toISOString() }));
@@ -58,7 +58,7 @@ export async function service(timezone = 'Australia/Sydney', deferEvents = false
     },
     log: { warn: () => {} },
   } as unknown as WorldHost;
-  const world = new RealtimeWeatherWorld(context, { request, now: () => now, openFile: async () => {}, random: () => 0 });
+  const world = new RealtimeWeatherWorld(context, { request, now: () => now, openFile: async () => {}, random });
   return { world, host, events, cfg, context, request, counts, errors, holds, headerKeys, botDir,
     /** start() returns before the background queries; wait for them like a running bot would observe. */
     async start() {

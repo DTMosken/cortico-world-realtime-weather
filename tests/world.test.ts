@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { service, weather } from './helpers/service.ts';
 import { REALTIME_WEATHER_CURRENT_INTERVAL_MS } from '../src/world.ts';
+import { solarTimes } from '../src/time.ts';
 
 let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
@@ -802,6 +803,27 @@ describe('实况与预报合并', () => {
       const solar = fixture.events.find(e => e.type === 'realtime-weather.solar');
       expect(solar?.text).toMatch(/｜(日出|日落)｜阴（沿用17:15）/);
     } finally { vi.useRealTimers(); }
+  });
+  it.each([
+    ['102', false], ['103', false], ['104', true], ['101', true], ['305', true],
+  ])('日出日落：天气%s是否使用阴雨句 %s', async (code, wet) => {
+    for (const kind of ['sunrise', 'sunset'] as const) {
+      fixture = await service('Australia/Sydney', false, () => 0.99);
+      const at = solarTimes(fixture.now, fixture.cfg.location!, 'Australia/Sydney')[kind]!.getTime();
+      fixture.now = at - 60_000;
+      fixture.current = weather({ condition: { code }, ...(code === '305' ? { precipitation: { type: 'rain', intensity: { value: 1 }, probability: 1, amount: { value: 1 } } } : {}) });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        await fixture.start();
+        fixture.now = at;
+        await vi.advanceTimersByTimeAsync(60_000);
+        const text = fixture.events.find(e => e.type === 'realtime-weather.solar')!.text!;
+        expect(text).toContain(kind === 'sunrise' ? '日出' : '日落');
+        const sentence = kind === 'sunrise' ? '被厚重的云层（或雨雾）遮着' : '本来就是阴雨天';
+        if (wet) expect(text).toContain(sentence); else expect(text).not.toContain(sentence);
+      } finally { vi.useRealTimers(); }
+      await fixture.close(); fixture = undefined;
+    }
   });
   it('地点缺少时区时不启动查询，不退回部署时区，重新选择城市后恢复', async () => {
     fixture = await service('UTC');

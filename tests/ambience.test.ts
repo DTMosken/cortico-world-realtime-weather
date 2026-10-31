@@ -33,6 +33,24 @@ describe('demo文案与部署覆盖', () => {
     expect(text).toContain('余光瞥见屋里的光线变了');
   });
 
+  it('冬季日出前的08点不使用日间起手', () => {
+    const { copy } = create();
+    const location = { name: 'Example', country: '', province: '', city: '', latitude: 60.17, longitude: 24.94, timezone: 'Europe/Helsinki' };
+    const text = copy.render('current', 'passive', '2026-12-21T06:30:00Z', location.timezone, ['rainStarted'], {}, location);
+    expect(text).toContain('刚清醒过来');
+    expect(text).not.toContain('余光瞥见屋里的光线变了');
+  });
+
+  it('日落没有其他匹配句时使用兜底句', () => {
+    const { file, copy } = create();
+    const fallback = '看了一眼窗外渐沉的暮色，白天不知不觉又过去了，顺手拉上了半边窗帘。';
+    const at = '2026-10-31T08:00:00Z';
+    expect(copy.render('sunset', 'passive', at, 'UTC', weatherTags({ conditionCode: '502', condition: '霾' }))).toBe(`[${fallback}]`);
+    const clear = new Ambience(file, () => 0.999).render('sunset', 'passive', at, 'UTC', weatherTags({ conditionCode: '100', condition: '晴' }));
+    expect(clear).not.toContain(fallback);
+    expect(clear).not.toBe('');
+  });
+
   it('大雨缺失强度不套小雨句，高UV低温不套热浪句', () => {
     const { copy } = create();
     const rain = weatherTags({ conditionCode: '307', condition: '大雨', precipitationType: 'rain' });

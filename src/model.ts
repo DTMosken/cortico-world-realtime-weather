@@ -78,7 +78,7 @@ export function weatherTags(w: Weather): string[] {
   const code = Number(w.conditionCode);
   const tags: string[] = [];
   if (code === 100 || code === 150) tags.push('clear');
-  else if (code >= 101 && code <= 104 || code >= 151 && code <= 154) tags.push('cloudy');
+  else if (code >= 101 && code <= 104 || code >= 151 && code <= 153) tags.push('cloudy');
   if (w.precipitationType === 'rain') {
     tags.push('rain');
     if (w.precipitationIntensity !== undefined) tags.push(w.precipitationIntensity < 2.5 ? 'lightRain' : 'heavyRain');
