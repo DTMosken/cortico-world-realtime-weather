@@ -6,6 +6,28 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('启动首轮成功亮绿灯，后续失败亮红灯，测试连接成功恢复绿灯', async () => {
+    fixture = await service();
+    const lamp = () => fixture!.world.webUi().lamps?.[0].state;
+    expect(lamp()).toBe('offline');
+    let release!: () => void;
+    fixture.holds.current = new Promise<void>(resolve => { release = resolve; });
+    const starting = fixture.world.start(fixture.host);
+    try { expect(lamp()).toBe('loading'); } finally { release(); await starting; }
+    expect(lamp()).toBe('online');
+    fixture.errors.alerts = 503;
+    await fixture.world.pollCurrent();
+    expect(lamp()).toBe('error');
+    delete fixture.errors.alerts;
+    await fixture.world.webUi().invoke!('config', 'testConnection', []);
+    expect(lamp()).toBe('online');
+  });
+  it('未启动时测试连接成功也亮绿灯', async () => {
+    fixture = await service();
+    await fixture.world.webUi().invoke!('config', 'testConnection', []);
+    expect(fixture.world.webUi().lamps?.[0].state).toBe('online');
+  });
+
   it('单个自定义配置面板可保存配置并按声明限制输入', async () => {
     fixture = await service();
     const page = fixture.world.webUi();

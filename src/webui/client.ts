@@ -94,7 +94,7 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
       '进入开发服务控制台的「设置」，找到并复制 API Host，填入上方的「QWeather API Host」。只填主机名，不加 https://。',
       '搜索并选择城市或区划，然后点击「测试连接」。',
     ]) steps.append(ui.h('li', null, text));
-    help.body.append(steps, ui.h('p', null, '新建凭据后，如果本扩展和官方 Playground 都返回 401，可等待一段时间后重试。401 表示认证未通过，仅凭该状态无法确定是否为凭据尚未生效；持续失败时请联系 QWeather 支持。'));
+    help.body.append(steps, ui.h('p', null, '新建凭据后，如果本扩展和官方 Playground 都返回 401，可等待一段时间后重试。'));
     sheet.body.append(help.el);
 
     const location = state.config.location;
@@ -122,7 +122,7 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
     filters.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px';
     filters.append(
       ui.field('上级行政区（可选）', ui.input({ value: adm, placeholder: '省、州或所属城市', disabled: !ready || searching, onInput: value => { adm = value; }, onCommit: () => { void searchCities(); } })),
-      ui.field('国家或地区代码（可选）', ui.input({ value: range, placeholder: 'ISO 国家代码，如 cn、au', disabled: !ready || searching, onInput: value => { range = value; }, onCommit: () => { void searchCities(); } })),
+      ui.field('国家或地区代码（可选）', ui.input({ value: range, placeholder: 'ISO 国家代码，如 cn、jp、us', disabled: !ready || searching, onInput: value => { range = value; }, onCommit: () => { void searchCities(); } })),
     );
     locationSheet.body.append(filters);
     locationSheet.body.append(searchRow, ui.msgline(!ready ? '请先填写 API Host 并保存密钥，再搜索地点。' : searchMessage, searchFailed));
@@ -148,13 +148,15 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
       alerts.body.append(ui.h('pre', null, JSON.stringify(state.alerts, null, 2))); sheet.body.append(alerts.el);
     }
     if (state.attributions.length) {
-      const attribution = ui.foldSheet('attributions', { title: '数据来源', defaultOpen: false });
+      const attribution = ui.h('footer');
+      attribution.style.cssText = 'font-size:12px;color:var(--ink-soft);overflow-wrap:anywhere';
+      attribution.append(ui.h('p', null, '数据来源'));
       for (const item of state.attributions) {
         if (/^https:\/\//.test(item)) {
-          const link = ui.h('a', null, item); link.href = item; link.target = '_blank'; link.rel = 'noopener noreferrer'; attribution.body.append(link, ui.h('br'));
-        } else attribution.body.append(ui.h('p', null, item));
+          const link = ui.h('a', null, item); link.href = item; link.target = '_blank'; link.rel = 'noopener noreferrer'; attribution.append(link, ui.h('br'));
+        } else attribution.append(ui.h('p', null, item));
       }
-      sheet.body.append(attribution.el);
+      layout.append(attribution);
     }
     ctx.root.replaceChildren(layout);
   }

@@ -277,11 +277,15 @@ export class RealtimeWeatherWorld implements World {
   }
 
   webUi(language?: Language): WorldWebUiDecl {
+    const loading = !!this.currentFlight || !!this.forecastFlight || !!this.airFlight;
+    const failed = Object.keys({ ...this.current?.errors, ...this.forecast?.errors }).length > 0;
+    const state = loading ? 'loading' : failed ? 'error' : this.current && this.forecast ? 'online' : 'offline';
     return {
+      lamps: [{ label: 'QWeather', state, hint: state === 'online' ? '最近一次天气与预报查询成功' : state === 'error' ? '最近一次查询有接口失败' : state === 'loading' ? '正在查询天气' : '尚未完成天气与预报查询' }],
       label: '实时天气',
       badges: [{ label: 'QWeather', value: this.ctx.secret(REALTIME_WEATHER_SECRET) ? '密钥已配置' : '密钥未配置' }, { label: '地点', value: this.ctx.cfg.location?.name ?? '未选择' }],
       panels: [{ id: 'config', title: '配置' }],
-      promptDocs: [{ key: 'worlds.realtime-weather.envPrompt', title: '实时天气', description: '天气工具、时间与氛围叙述的含义。', path: ENV_PROMPT_FILE, role: 'envPrompt' }],
+      promptDocs: [{ key: 'worlds.realtime-weather.envPrompt', title: '实时天气 · 环境提示词', description: '天气工具、时间与氛围叙述的含义。', path: ENV_PROMPT_FILE, role: 'envPrompt' }],
       invoke: async (panel, method, args) => {
         if (panel !== 'config') throw new Error('未知面板');
         if (method === 'state') {

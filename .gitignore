@@ -2,3 +2,9 @@ node_modules/
 dist/
 scratch/
 *.log
+
+.env
+.env.*
+.npmrc
+.agy-staff/
+*.tgz

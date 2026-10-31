@@ -4,18 +4,58 @@
   "type": "module",
   "description": "实时天气、空气质量、官方预警与天气预报。",
   "license": "MIT",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "packageManager": "pnpm@11.28.6",
   "main": "./src/index.ts",
-  "keywords": ["cortico-world", "cortico"],
-  "cortico": { "kind": "world", "api": 6, "displayName": "实时天气", "webUiClient": "dist/webui.js", "describe": "describe.json", "tags": ["requires-key", "external-setup"] },
-  "files": ["src", "dist", "README.md", "CHANGELOG.md", "describe.json"],
+  "keywords": [
+    "cortico-world",
+    "cortico"
+  ],
+  "cortico": {
+    "kind": "world",
+    "api": 6,
+    "displayName": "实时天气",
+    "webUiClient": "dist/webui.js",
+    "describe": "describe.json",
+    "tags": [
+      "internet",
+      "requires-key",
+      "external-setup"
+    ]
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "describe.json"
+  ],
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "typecheck:web": "tsc -p tsconfig.web.json --noEmit",
     "build:web": "esbuild src/webui/client.ts --bundle --format=esm --outfile=dist/webui.js"
   },
-  "dependencies": { "suncalc": "2.1.1" },
-  "devDependencies": { "@types/node": "^22.10.0", "cortico": "^0.2.10", "esbuild": "^0.28.2", "tsx": "^4.19.2", "typescript": "^5.7.2", "vitest": "^2.1.8" }
+  "dependencies": {
+    "suncalc": "2.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "cortico": "^0.2.10",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "author": "DTMosken",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DTMosken/cortico-world-realtime-weather.git"
+  },
+  "homepage": "https://github.com/DTMosken/cortico-world-realtime-weather#readme",
+  "bugs": {
+    "url": "https://github.com/DTMosken/cortico-world-realtime-weather/issues"
+  }
 }

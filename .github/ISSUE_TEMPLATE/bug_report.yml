@@ -1,0 +1,33 @@
+name: 缺陷报告
+description: 报告错误行为并提供复现信息。
+title: "[缺陷] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 请移除密钥、API Host、坐标和私人资料；安全漏洞通过 security@mosken.observer 私密报告。
+  - type: textarea
+    id: environment
+    attributes:
+      label: 版本与运行环境
+      placeholder: 扩展版本、Cortico 版本、Node.js 版本、操作系统
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为与预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 提供操作步骤；天气变化问题请附脱敏后的前后数据与回执。
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 脱敏日志与配置
+      render: text
