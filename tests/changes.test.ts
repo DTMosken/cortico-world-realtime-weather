@@ -112,6 +112,12 @@ describe('双向变化', () => {
     expect(weatherChanges(rain, { ...rain, conditionCode: '302' }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).not.toContain('rainWeaker');
     expect(weatherChanges({ ...rain, conditionCode: '300', precipitationIntensity: 1 }, { ...rain, conditionCode: '300', precipitationIntensity: 9 }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toContain('rainStronger');
   });
+  it('同批消息互相取代时不无限追溯前序消息', () => {
+    const a: Alert = { id: 'a', event: '大风', severity: 'moderate', kind: 'update', supersedes: ['b'] };
+    const b: Alert = { ...a, id: 'b', supersedes: ['a'] };
+    const c: Alert = { ...a, id: 'c', supersedes: ['a'] };
+    expect(alertChanges([], [a, b, c], 0).map(c => c.id)).toEqual(['alertAdded']);
+  });
   it('忽略未知前序取消与同批已被取代的消息，区分升级和普通更新', () => {
     const old: Alert = { id: 'a', event: '寒潮', severity: 'moderate', color: 'yellow', kind: 'alert', supersedes: [] };
     const next: Alert = { ...old, id: 'b', color: 'orange', kind: 'update', supersedes: ['a'] };

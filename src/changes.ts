@@ -7,6 +7,9 @@ export function precipitationRank(w: Weather): number | undefined {
   return ranks[w.conditionCode];
 }
 
+/** UV相对提醒基线的累计变化阈值。 */
+export const UV_CHANGE = 3;
+
 /** 数值基线在达到阈值或完整通知时前移；缺失数值保留基线。 */
 export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeWeatherConfigSection, resetBaseline = false): { changes: Change[]; baseline: Weather } {
   const changes: Change[] = [];
@@ -56,7 +59,7 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     }
   }
   for (const [key, threshold, unit, label, up, down] of [
-    ['uv', 3, '', 'UV ', 'uvUp', 'uvDown'],
+    ['uv', UV_CHANGE, '', 'UV ', 'uvUp', 'uvDown'],
     ['temperature', cfg.temperatureChange, '°C', '温度', 'temperatureUp', 'temperatureDown'],
     ['feelsLike', cfg.temperatureChange, '°C', '体感', 'feelsLikeUp', 'feelsLikeDown'],
     ['windScale', cfg.windScaleChange, '级', '风力', 'windUp', 'windDown'],
@@ -87,13 +90,14 @@ export function alertChanges(before: Alert[], messages: Alert[], now: number, ti
   const severity = ['unknown', 'minor', 'moderate', 'severe', 'extreme'];
   const colors = ['white', 'green', 'blue', 'yellow', 'amber', 'orange', 'red', 'purple', 'black'];
   const messagesById = new Map(messages.map(a => [a.id, a]));
-  const previousMessage = (alert: Alert): Alert | undefined => {
+  const previousMessage = (alert: Alert, visited = new Set([alert.id])): Alert | undefined => {
     for (const id of alert.supersedes) {
       const known = old.get(id);
       if (known) return known;
       const intermediate = messagesById.get(id);
-      if (intermediate) {
-        const earlier = previousMessage(intermediate);
+      if (intermediate && !visited.has(id)) {
+        visited.add(id);
+        const earlier = previousMessage(intermediate, visited);
         if (earlier) return earlier;
       }
     }
