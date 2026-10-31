@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { weatherTags } from '../src/model.ts';
 import { Ambience } from '../src/ambience.ts';
 import defaults from '../src/ambience.default.json' with { type: 'json' };
 
@@ -13,6 +14,17 @@ function create() {
   return { file, copy: new Ambience(file, () => 0) };
 }
 describe('demo文案与部署覆盖', () => {
+  it('大雨缺失强度不套小雨句，高UV低温不套热浪句', () => {
+    const { copy } = create();
+    const rain = weatherTags({ conditionCode: '307', condition: '大雨', precipitationType: 'rain' });
+    expect(rain).toContain('heavyRain'); expect(rain).not.toContain('lightRain');
+    expect(copy.render('current', 'active', '2026-10-31T12:00:00Z', 'UTC', rain)).not.toContain('细密的雨丝');
+    const clear = weatherTags({ conditionCode: '100', condition: '晴', temperature: 5, feelsLike: 5, uv: 8 });
+    expect(copy.render('current', 'active', '2026-10-31T12:00:00Z', 'UTC', [...clear, 'daylight'])).not.toContain('热浪');
+    expect(weatherTags({ conditionCode: '100', condition: '晴', temperature: 33 })).toContain('hot');
+    expect(weatherTags({ conditionCode: '399', condition: '雨', precipitationType: 'rain' })).toEqual(['rain']);
+  });
+
   it('开始下雨按demo拼装；日间UV跨级匹配普通及极值候选', () => {
     const { copy } = create();
     const text = copy.render('current', 'passive', '2026-10-31T14:15:00Z', 'UTC', ['rainStarted']);

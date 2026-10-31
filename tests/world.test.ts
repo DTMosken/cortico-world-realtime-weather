@@ -6,6 +6,32 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('跨整点合入完整预报时只重置实际展示小时的基线', async () => {
+    fixture = await service('UTC');
+    fixture.now = Date.parse('2026-10-31T07:30:00Z');
+    fixture.hours.forEach((h, i) => { h.forecastTime = `2026-10-31T${String(8 + i).padStart(2, '0')}:00:00Z`; });
+    await fixture.world.start(fixture.host); fixture.events.length = 0;
+    fixture.hours.forEach(h => { h.uvIndex = 4; });
+    fixture.now = Date.parse('2026-10-31T07:59:59Z');
+    let release!: () => void;
+    fixture.holds.hours = new Promise<void>(resolve => { release = resolve; });
+    const first = fixture.world.pollForecast();
+    let summary: Promise<void> | undefined;
+    try {
+      await vi.waitFor(() => expect(fixture!.counts.hours).toBe(2));
+      fixture.now = Date.parse('2026-10-31T08:00:01Z');
+      summary = fixture.world.pollForecast('summary');
+    } finally { release(); await Promise.all([first, summary]); }
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).toContain('19:00｜');
+    expect(fixture.events[0].text).toContain('20:00｜');
+    expect(fixture.events[0].text).not.toContain('21:00｜');
+    fixture.hours[2].uvIndex = 5;
+    await fixture.world.pollForecast();
+    expect(fixture.events).toHaveLength(2);
+    expect(fixture.events[1].text).toContain('21:00｜UV 2→5');
+  });
+
   it('第三小时达到阈值的变化进入展示窗口后只提醒一次', async () => {
     fixture = await service(); await fixture.world.start(fixture.host); fixture.events.length = 0;
     fixture.hours[2].uvIndex = 5;

@@ -203,7 +203,7 @@ export class RealtimeWeatherWorld implements World {
     const changes: Change[] = [];
     const next: Forecast = { ...current, hours: [], days: [] };
     const selection: ForecastSelection = { hours: new Map(), days: new Map() };
-    const visibleHours = new Set(current.hours.filter(h => Date.parse(h.at) > this.now()).slice(0, 2).map(h => h.at));
+    const visibleHours = new Set(current.hours.filter(h => Date.parse(h.at) > Date.parse(current.at)).slice(0, 2).map(h => h.at));
     for (const hour of current.hours) {
       const old = this.previousForecast?.hours.find(h => h.at === hour.at);
       if (current.errors.hours || !visibleHours.has(hour.at)) { next.hours.push(old ?? hour); continue; }

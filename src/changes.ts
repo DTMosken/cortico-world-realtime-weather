@@ -28,7 +28,8 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     if (oldTags.includes(phenomenon) && newTags.some(t => ['clear', 'cloudy'].includes(t))) add(`${phenomenon}Cleared`, phenomenon === 'haze' ? '霾消退' : '沙尘消退');
   }
   const oldType = before.precipitationType ?? 'unknown', newType = current.precipitationType ?? 'unknown';
-  if (oldType !== newType) {
+  if (newType === 'unknown') baseline.precipitationType = before.precipitationType;
+  if (oldType !== 'unknown' && newType !== 'unknown' && oldType !== newType) {
     if (newType === 'none' && (oldType === 'ice' || before.conditionCode === '313')) add('precipitationStopped', '特殊降水停止');
     else if (oldType === 'none' && newType === 'mixed') add('mixedStarted', '开始下雨夹雪');
     else if (oldType === 'mixed' && newType === 'none') add('mixedStopped', '雨夹雪停止');
@@ -40,7 +41,7 @@ export function weatherChanges(before: Weather, current: Weather, cfg: RealtimeW
     else if (newType === 'none' && (oldType === 'rain' || oldType === 'snow')) add(oldType === 'rain' ? 'rainStopped' : 'snowStopped', oldType === 'rain' ? '雨停了' : '雪停了');
     else if (newType === 'none') add('precipitationUpdated', '当前无降水');
     else add('precipitationChanged', '降水类型改变');
-  } else if (['rain', 'snow'].includes(newType)) {
+  } else if (oldType === newType && ['rain', 'snow'].includes(newType)) {
     // Only compare known intensity classes; shower/type codes do not imply a strength.
     const oldRank = precipitationRank(before), newRank = precipitationRank(current);
     if (oldRank !== undefined && newRank !== undefined && oldRank !== newRank) {

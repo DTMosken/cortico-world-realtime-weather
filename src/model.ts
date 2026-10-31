@@ -83,7 +83,12 @@ export function weatherTags(w: Weather): string[] {
   const tags: string[] = [];
   if (code === 100 || code === 150) tags.push('clear');
   else if (code >= 101 && code <= 104 || code >= 151 && code <= 154) tags.push('cloudy');
-  if (w.precipitationType === 'rain') tags.push('rain', (w.precipitationIntensity ?? 0) < 2.5 ? 'lightRain' : 'heavyRain');
+  if (w.precipitationType === 'rain') {
+    tags.push('rain');
+    if (w.precipitationIntensity !== undefined) tags.push(w.precipitationIntensity < 2.5 ? 'lightRain' : 'heavyRain');
+    else if ([305, 309].includes(code)) tags.push('lightRain');
+    else if ([307, 308, 310, 311, 312, 316, 317, 318].includes(code)) tags.push('heavyRain');
+  }
   if (w.precipitationType === 'snow') {
     tags.push('snow');
     if ([402, 403, 409, 410].includes(code)) tags.push('heavySnow');
@@ -99,7 +104,7 @@ export function weatherTags(w: Weather): string[] {
   if ([503, 504, 507, 508].includes(code)) tags.push('dust');
   if ((w.windScale ?? 0) >= 5) tags.push('windy');
   if ((w.feelsLike ?? Infinity) < 0) tags.push('freezing');
-  if ((w.temperature ?? -Infinity) > 32 || (w.uv ?? 0) > 7) tags.push('hot');
+  if ((w.temperature ?? -Infinity) > 32) tags.push('hot');
   if ((w.humidity ?? 0) > 0.8 && (w.temperature ?? 0) >= 28) tags.push('humidHot');
   return tags;
 }
