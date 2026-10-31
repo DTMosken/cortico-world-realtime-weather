@@ -297,7 +297,7 @@ export class RealtimeWeatherWorld implements World {
         .catch(() => { this.host?.log.warn('每日预报未完成'); })
         .finally(() => { this.tasks.delete(task); if (this.host) this.scheduleDailyForecast(); });
       this.tasks.add(task);
-    }, nextDailyForecastAt(this.now(), this.ctx.timezone) - this.now());
+    }, nextDailyForecastAt(this.now(), this.timezone()) - this.now());
     timer.unref(); this.timers.add(timer);
   }
   private scheduleSolar(): void {

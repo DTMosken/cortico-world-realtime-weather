@@ -320,9 +320,9 @@ describe('实况与预报合并', () => {
     expect(fixture.events[0].text).toContain('UV最高7');
   });
 
-  it('每日按部署时区08:00投递完整预报，即使预测没有修订', async () => {
+  it('每日按保存的地点时区08:00投递完整预报，不受部署时区影响且不要求预测修订', async () => {
     fixture = await service('Asia/Shanghai');
-    fixture.now = Date.parse('2026-10-30T23:59:00Z');
+    fixture.now = Date.parse('2026-10-30T20:59:00Z');
     fixture.hours = [1, 2, 3].map(offset => ({ ...weather(), forecastTime: new Date(fixture!.now + offset * 3600000).toISOString() }));
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
@@ -335,8 +335,8 @@ describe('实况与预报合并', () => {
       await vi.advanceTimersByTimeAsync(1_000);
       await vi.waitFor(() => expect(fixture!.events).toHaveLength(1));
       expect(fixture.events[0].type).toBe('realtime-weather.forecast');
-      expect(fixture.events[0].text).toContain('11:59');
-      expect(fixture.events[0].text).toContain('12:59');
+      expect(fixture.events[0].text).toContain('08:59');
+      expect(fixture.events[0].text).toContain('09:59');
       expect(fixture.events[0].text).toContain('11/01');
       expect(fixture.events[0].text).not.toMatch(/PRIVATE_|42\.33|101\.12/);
       expect(fixture.counts).toMatchObject({ current: 1, alerts: 1, air: 1, hours: 2, days: 2 });
