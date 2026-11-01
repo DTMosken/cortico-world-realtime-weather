@@ -9,6 +9,36 @@ let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
 describe('实况与预报合并', () => {
+  it('实况降水结合强度与累计量，零强度类型波动不报起停', async () => {
+    fixture = await service();
+    await fixture.start(); fixture.events.length = 0;
+    const rain = (intensity: number | undefined, amount: number | undefined, type = 'rain') => weather({
+      precipitation: { type, ...(intensity === undefined ? {} : { intensity: { value: intensity } }), ...(amount === undefined ? {} : { amount: { value: amount } }) },
+    });
+    for (const next of [rain(0, 0), rain(0, 0, 'none'), rain(undefined, 0), rain(undefined, 2)]) {
+      fixture.current = next;
+      await fixture.world.pollCurrent();
+    }
+    expect(fixture.events).toEqual([]);
+    fixture.current = rain(0.2, 0);
+    await fixture.world.pollCurrent();
+    expect(fixture.events).toHaveLength(1);
+    expect(fixture.events[0].text).toContain('开始下雨');
+    fixture.current = rain(undefined, 2);
+    await fixture.world.pollCurrent();
+    expect(fixture.events).toHaveLength(1);
+    fixture.current = rain(0.2, 2);
+    await fixture.world.pollCurrent();
+    expect(fixture.events).toHaveLength(1);
+    fixture.current = rain(0, 2);
+    await fixture.world.pollCurrent();
+    expect(fixture.events).toHaveLength(2);
+    expect(fixture.events[1].text).toContain('雨停了');
+    fixture.current = rain(0, 2, 'none');
+    await fixture.world.pollCurrent();
+    expect(fixture.events).toHaveLength(2);
+  });
+
   it.each(['预警发布', '降水概率'])('天气仍阴、仅%s变化时不夹带静态厚云句', async (change) => {
     fixture = await service();
     await fixture.start(); fixture.events.length = 0;
@@ -505,7 +535,7 @@ describe('实况与预报合并', () => {
     ['402', true], ['403', true], ['409', true], ['410', true],
   ])('降雪代码%s的大雪描述符合强度分类', async (code, heavy) => {
     fixture = await service();
-    fixture.current = weather({ condition: { code }, precipitation: { type: 'snow' } });
+    fixture.current = weather({ condition: { code }, precipitation: { type: 'snow', intensity: { value: 0.2 } } });
     const text = await fixture.world.tools()[0].handler({}, {} as never);
     expect(String(text).includes('鹅毛大雪')).toBe(heavy);
     if (['401', '407', '457', '499'].includes(code)) expect(String(text)).toContain('窗外正飘着雪');
@@ -526,9 +556,9 @@ describe('实况与预报合并', () => {
   });
   it.each(['none', 'mixed'])('特殊降水转%s只在仍降水时使用形态变化句', async after => {
     fixture = await service();
-    fixture.current = weather({ condition: { code: '999' }, precipitation: { type: 'ice' } });
+    fixture.current = weather({ condition: { code: '999' }, precipitation: { type: 'ice', intensity: { value: 0.2 } } });
     await fixture.start(); fixture.events.length = 0;
-    fixture.current = weather({ condition: { code: '999' }, precipitation: { type: after } });
+    fixture.current = weather({ condition: { code: '999' }, precipitation: { type: after, intensity: { value: after === 'none' ? 0 : 0.2 } } });
     await fixture.world.pollCurrent();
     const text = fixture.events.at(-1)!.text!;
     if (after === 'none') {

@@ -116,7 +116,11 @@ export class QWeather {
     return `${location.latitude}/${location.longitude}`;
   }
   async current(signal?: AbortSignal): Promise<Weather> {
-    return normalizeWeather(await this.get<RawWeather>(`/weather/v1/current/${this.point()}?lang=zh`, signal));
+    const weather = normalizeWeather(await this.get<RawWeather>(`/weather/v1/current/${this.point()}?lang=zh`, signal));
+    // 累计量覆盖过去一小时；它不能在强度为零或缺失时证明当前仍在降水。
+    if (weather.precipitationIntensity === 0 || weather.precipitationIntensity === undefined && weather.precipitationAmount === 0) weather.precipitationType = 'none';
+    else if (weather.precipitationIntensity === undefined && weather.precipitationType !== 'none') weather.precipitationType = 'unknown';
+    return weather;
   }
   async hourly(signal?: AbortSignal): Promise<Hour[]> {
     const result = await this.get<{ hours: (RawWeather & { forecastTime: string })[] }>(`/weather/v1/hourly/${this.point()}?hours=3&lang=zh`, signal);
