@@ -29,16 +29,12 @@ export interface Air {
   level: number;
   category: string;
   primary?: string;
-  pm25?: number;
 }
 export interface Alert {
   id: string;
   event: string;
   severity: string;
   color?: string;
-  urgency?: string;
-  certainty?: string;
-  issuedAt?: string;
   effectiveAt?: string;
   onsetAt?: string;
   expiresAt?: string;
@@ -78,12 +74,25 @@ export function conditionCode(code: string): string {
   return ({ '150': '100', '151': '101', '152': '102', '153': '103', '350': '300', '351': '301', '456': '406', '457': '407' } as Record<string, string>)[code] ?? code;
 }
 
+/** 天气描述是否属降水类：300–499 为是，1xx、5xx 为否，9xx 不判断。 */
+export function describesPrecipitation(w: Weather): boolean | undefined {
+  const code = Number(w.conditionCode);
+  return code >= 300 && code < 500 ? true : code < 600 ? false : undefined;
+}
+/** 降水判断已确认正在降水；unknown 与 none 都不算。 */
+export const precipitating = (w: Weather) => ['rain', 'snow', 'mixed', 'ice'].includes(w.precipitationType ?? '');
+
 export function weatherTags(w: Weather): string[] {
   const code = Number(w.conditionCode);
   const tags: string[] = [];
   if (code === 100 || code === 150) tags.push('clear');
-  else if (code >= 101 && code <= 104 || code >= 151 && code <= 154) tags.push('cloudy');
-  if (w.precipitationType === 'rain') tags.push('rain', (w.precipitationIntensity ?? 0) < 2.5 ? 'lightRain' : 'heavyRain');
+  else if (code >= 101 && code <= 104 || code >= 151 && code <= 153) tags.push('cloudy');
+  if (w.precipitationType === 'rain') {
+    tags.push('rain');
+    if (w.precipitationIntensity !== undefined) tags.push(w.precipitationIntensity < 2.5 ? 'lightRain' : 'heavyRain');
+    else if ([305, 309].includes(code)) tags.push('lightRain');
+    else if ([307, 308, 310, 311, 312, 316, 317, 318].includes(code)) tags.push('heavyRain');
+  }
   if (w.precipitationType === 'snow') {
     tags.push('snow');
     if ([402, 403, 409, 410].includes(code)) tags.push('heavySnow');
@@ -99,7 +108,7 @@ export function weatherTags(w: Weather): string[] {
   if ([503, 504, 507, 508].includes(code)) tags.push('dust');
   if ((w.windScale ?? 0) >= 5) tags.push('windy');
   if ((w.feelsLike ?? Infinity) < 0) tags.push('freezing');
-  if ((w.temperature ?? -Infinity) > 32 || (w.uv ?? 0) > 7) tags.push('hot');
+  if ((w.temperature ?? -Infinity) > 32) tags.push('hot');
   if ((w.humidity ?? 0) > 0.8 && (w.temperature ?? 0) >= 28) tags.push('humidHot');
   return tags;
 }

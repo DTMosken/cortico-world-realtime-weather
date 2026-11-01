@@ -6,14 +6,14 @@ import type { ToolDef, World, WorldHost, WorldWebUiDecl } from 'cortico/core/typ
 import type { WorldContext } from 'cortico/world.ts';
 import { nowIso } from 'cortico/core/util.ts';
 import type { Language } from 'cortico/core/language.ts';
-import { REALTIME_WEATHER_SECRET, realtimeWeatherConfigGroup, type Location, type RealtimeWeatherConfigSection } from './config.ts';
-import { apiBase, QWeather } from './qweather.ts';
+import { REALTIME_WEATHER_SECRET, realtimeWeatherConfigGroup, type CityCandidate, type RealtimeWeatherConfigSection } from './config.ts';
+import { apiBase, LOCATION_TIMEZONE_MISSING, QWeather, QWeatherError } from './qweather.ts';
 import { Ambience } from './ambience.ts';
-import { alertChanges, weatherChanges } from './changes.ts';
-import { clock, isDaylight, solarTimes } from './time.ts';
+import { alertChanges, UV_CHANGE, weatherChanges } from './changes.ts';
+import { clock, isDaylight, solarTimes, nextDailyForecastAt } from './time.ts';
 import { forecastTags, type ForecastSelection } from './forecast.ts';
-import { airStandard, currentLine, dayLine, forecastLines } from './format.ts';
-import { weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
+import { airStandard, currentLine, dayLine, dayMetrics, forecastLines } from './format.ts';
+import { describesPrecipitation, precipitating, weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
 import { ensureParent, openFile, prepareKeyFile } from './files.ts';
 
 const ENV_PROMPT_FILE = fileURLToPath(new URL('./ENV_PROMPT.md', import.meta.url));
@@ -23,15 +23,19 @@ export const REALTIME_WEATHER_TOOL_DECLS: ReadonlyArray<Omit<ToolDef, 'handler'>
   { name: 'realtime_weather_current', description: '查看配置地点的当前天气、空气质量与有效天气预警。', tags: ['read'], parameters: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'realtime_weather_forecast', description: '查看未来第1、第2小时与多日天气预报；明天天气取逐日摘要。', tags: ['read'], parameters: { type: 'object', properties: {}, additionalProperties: false } },
 ];
+type ForecastPollMode = 'changes' | 'summary' | 'silent';
+interface ForecastPoll { mode: ForecastPollMode; promise: Promise<void> }
+
 export interface RealtimeWeatherWorldOptions {
   request?: typeof fetch;
   now?: () => number;
   openFile?: (file: string) => Promise<void>;
   random?: () => number;
 }
+/** 多云、阴及其夜间代码。 */
+const THICK_CLOUD = ['101', '104', '151'];
 function errorText(error: unknown): string {
-  const message = error instanceof Error ? error.message : '';
-  return /^(QWeather (HTTP \d{3}|请求未完成|响应格式错误)|密钥未配置|尚未选择城市或区划|空气质量暂无数据|API Host 须为)/.test(message) ? message : '响应处理失败';
+  return error instanceof QWeatherError ? error.message : '响应处理失败';
 }
 
 export class RealtimeWeatherWorld implements World {
@@ -45,15 +49,17 @@ export class RealtimeWeatherWorld implements World {
   private currentFlight?: Promise<Current>;
   private airFlight?: Promise<PromiseSettledResult<Air>>;
   private forecastFlight?: Promise<Forecast>;
+  private forecastPoll?: ForecastPoll;
   private current?: Current;
   private forecast?: Forecast;
   private weatherBaseline?: Weather;
   private previous?: Current;
   private previousForecast?: Forecast;
   private cycle = 0;
+  private initialized = false;
   private airVisibilityBaseline?: number;
   private airHazeBaseline = false;
-  private candidates: Location[] = [];
+  private candidates: CityCandidate[] = [];
   private readonly now: () => number;
   private readonly open: (file: string) => Promise<void>;
 
@@ -75,12 +81,17 @@ export class RealtimeWeatherWorld implements World {
     } }));
   }
   private timezone(): string { return this.ctx.cfg.location?.timezone ?? this.ctx.timezone; }
+  private locationError(): string | undefined { return this.ctx.cfg.location && !this.ctx.cfg.location.timezone ? LOCATION_TIMEZONE_MISSING : undefined; }
   private tags(weather?: Weather): string[] {
-    return [...(weather ? weatherTags(weather) : []), ...(this.ctx.cfg.location && isDaylight(this.now(), this.ctx.cfg.location) ? ['daylight'] : ['dark']), ...((weather?.windScale ?? 0) < 4 ? ['calm'] : []), ...(weather && (weatherTags(weather).some(tag => ['cloudy', 'fog'].includes(tag)) || ['rain', 'snow', 'mixed'].includes(weather.precipitationType ?? '')) ? ['cloudyOrWet'] : [])];
+    // 雷雨文案须有确认降水；weatherTags() 本身不改，起停判断仍按描述识别雷阵雨。
+    return [...(weather ? weatherTags(weather).filter(t => t !== 'thunder' || precipitating(weather)) : []), ...(this.ctx.cfg.location && isDaylight(this.now(), this.ctx.cfg.location) ? ['daylight'] : ['dark']), ...((weather?.windScale ?? 0) < 4 ? ['calm'] : []), ...(weather && (THICK_CLOUD.includes(weather.conditionCode) || weatherTags(weather).includes('fog') || ['rain', 'snow', 'mixed'].includes(weather.precipitationType ?? '')) ? ['cloudyOrWet'] : [])];
   }
   private currentReceipt(current: Current, trigger: 'active' | 'passive', changes?: Change[]): string {
     const weather = current.errors.weather ? undefined : current.weather;
     const tags = changes ? ['current', ...changes.map(c => c.id), ...this.tags(weather).filter(t => ['daylight', 'dark', 'calm', 'cloudyOrWet'].includes(t))] : ['current', ...this.tags(weather)];
+    const thickCloud = weather && THICK_CLOUD.includes(weather.conditionCode);
+    if (thickCloud) tags.push('thickCloud');
+    if (changes?.some(c => c.id === 'becameCloudy') && !thickCloud && tags.includes('dark')) tags.push('conditionChanged');
     if (weather?.uv !== undefined) { if (weather.uv >= 7) tags.push('highUv'); if (weather.uv <= 2) tags.push('lowUv'); }
     if (current.air && goodAir(current.air) && weather?.visibilityKm !== undefined && this.airVisibilityBaseline !== undefined && weather.visibilityKm > this.airVisibilityBaseline) tags.push('clearerAir');
     if (weather && weatherTags(weather).some(tag => ['clear', 'cloudy'].includes(tag))) tags.push('clearAirWeather');
@@ -100,13 +111,13 @@ export class RealtimeWeatherWorld implements World {
     if (weather?.visibilityKm !== undefined && this.previous?.weather?.visibilityKm !== undefined && weather.visibilityKm >= this.previous.weather.visibilityKm) tags.push('visibilityNotFallen');
     if (weather && weather.condition !== '未知') tags.push([500, 501, 509, 510, 514, 515].includes(Number(weather.conditionCode)) ? 'fogPresent' : 'noFog');
     const alertTypes = Object.fromEntries((changes ?? []).filter(c => c.alertType).map(c => [c.id, [...new Set(changes!.filter(other => other.id === c.id).map(other => other.alertType))].join('、')]));
-    const atmosphere = this.ambience.render('current', trigger, current.at, this.timezone(), tags, alertTypes);
+    const atmosphere = this.ambience.render('current', trigger, current.at, this.timezone(), tags, alertTypes, this.ctx.cfg.location ?? undefined);
     const data = changes ? `${clock(current.at, this.timezone())}｜${changes.map(c => c.text).join('｜')}` : currentLine(current, this.timezone());
     return [data, atmosphere].filter(Boolean).join('\n\n');
   }
   private forecastReceipt(forecast: Forecast, trigger: 'active' | 'passive', changes?: Change[], selection?: ForecastSelection): string {
     const tags = forecastTags(forecast, this.current?.errors.weather ? undefined : this.current?.weather, this.ctx.cfg, this.timezone(), selection);
-    const atmosphere = this.ambience.render('forecast', trigger, forecast.at, this.timezone(), tags);
+    const atmosphere = this.ambience.render('forecast', trigger, forecast.at, this.timezone(), tags, {}, this.ctx.cfg.location ?? undefined);
     const data = changes ? `${clock(forecast.at, this.timezone())}\n${changes.map(c => c.text).join('\n')}` : forecastLines(forecast, this.timezone());
     return [data, atmosphere].filter(Boolean).join('\n\n');
   }
@@ -153,14 +164,17 @@ export class RealtimeWeatherWorld implements World {
     void flight.finally(() => { this.tasks.delete(flight); this.forecastFlight = undefined; });
     return flight;
   }
-  async pollCurrent(): Promise<void> {
+  async pollCurrent(notify = true): Promise<void> {
     const host = this.host;
     const current = await this.loadCurrent(this.cycle++ % 4 === 0);
     const changes: Change[] = [];
     if (current.weather && !current.errors.weather) {
       if (this.weatherBaseline) {
-        const result = weatherChanges(this.weatherBaseline, current.weather, this.ctx.cfg);
-        changes.push(...result.changes); this.weatherBaseline = result.baseline;
+        const before = this.weatherBaseline, weather = current.weather;
+        // 描述变化须与降水判断一致：变为降水类（含降水类内部变化）须确认降水，降水类转非降水类须确认无降水；未确认前沿用基线描述，确认后与起停一并通知。
+        const held = describesPrecipitation(weather) && !precipitating(weather) || describesPrecipitation(before) && describesPrecipitation(weather) === false && weather.precipitationType !== 'none';
+        const result = weatherChanges(before, held ? { ...weather, conditionCode: before.conditionCode, condition: before.condition } : weather, this.ctx.cfg);
+        changes.push(...result.changes.filter(c => c.id !== 'thunderToRain' || precipitating(weather))); this.weatherBaseline = result.baseline;
       } else this.weatherBaseline = current.weather;
     }
     if (this.previous?.air && current.air && current.air.standard === this.previous.air.standard && current.air.level !== this.previous.air.level) changes.push({ id: current.air.level > this.previous.air.level ? 'airDown' : 'airUp', text: `AQI(${airStandard(current.air.standard)}) ${this.previous.air.value}（${this.previous.air.category}）→${current.air.value}（${current.air.category}，${clock(current.air.at, this.timezone())}）` });
@@ -174,21 +188,35 @@ export class RealtimeWeatherWorld implements World {
       this.airHazeBaseline = !!current.weather && weatherTags(current.weather).includes('haze');
     }
     this.previous = current;
-    if (receipt && host && this.host === host && !this.controller.signal.aborted) await this.push('realtime-weather.changed', receipt);
+    if (notify && receipt && host && this.host === host) await this.push('realtime-weather.changed', receipt);
   }
-  async pollForecast(): Promise<void> {
+  pollForecast(mode: ForecastPollMode = 'changes'): Promise<void> {
+    if (this.forecastPoll) {
+      if (mode === 'summary') this.forecastPoll.mode = mode;
+      return this.forecastPoll.promise;
+    }
+    const poll: ForecastPoll = { mode, promise: Promise.resolve() };
+    this.forecastPoll = poll;
+    poll.promise = this.runForecastPoll(poll).finally(() => {
+      if (this.forecastPoll === poll) this.forecastPoll = undefined;
+    });
+    return poll.promise;
+  }
+  private async runForecastPoll(poll: ForecastPoll): Promise<void> {
     const host = this.host;
     const current = await this.loadForecast();
+    const mode = poll.mode;
+    this.forecastPoll = undefined;
     const changes: Change[] = [];
     const next: Forecast = { ...current, hours: [], days: [] };
     const selection: ForecastSelection = { hours: new Map(), days: new Map() };
-    const visibleHours = new Set(current.hours.filter(h => Date.parse(h.at) > this.now()).slice(0, 2).map(h => h.at));
+    const visibleHours = new Set(current.hours.filter(h => Date.parse(h.at) > Date.parse(current.at)).slice(0, 2).map(h => h.at));
     for (const hour of current.hours) {
       const old = this.previousForecast?.hours.find(h => h.at === hour.at);
-      if (current.errors.hours) { next.hours.push(old ?? hour); continue; }
+      if (current.errors.hours || !visibleHours.has(hour.at)) { next.hours.push(old ?? hour); continue; }
       if (old) {
-        const result = weatherChanges(old, hour, this.ctx.cfg);
-        if (result.changes.length && visibleHours.has(hour.at)) {
+        const result = weatherChanges(old, hour, this.ctx.cfg, mode === 'summary');
+        if (result.changes.length) {
           changes.push({ id: 'hourChanged', text: `${clock(hour.at, this.timezone())}｜${result.changes.map(c => c.text).join('｜')}` });
           selection.hours.set(hour.at, result.changes);
         }
@@ -201,27 +229,59 @@ export class RealtimeWeatherWorld implements World {
       const dayChanges: Change[] = [];
       const baseline: Day = { ...day };
       let changed = false;
-      if (old && !current.errors.days) {
+      if (old) {
         for (const part of ['daytime', 'nighttime'] as const) {
-          const result = weatherChanges(old[part], day[part], this.ctx.cfg);
+          const result = weatherChanges(
+            { ...old[part], windScale: undefined, precipitationProbability: undefined },
+            { ...day[part], windScale: undefined, precipitationProbability: undefined },
+            this.ctx.cfg,
+          );
+          result.baseline.windScale = old[part].windScale;
+          result.baseline.precipitationProbability = old[part].precipitationProbability;
           baseline[part] = result.baseline;
           dayChanges.push(...result.changes);
           changed ||= result.changes.length > 0;
         }
-        for (const key of ['min', 'max'] as const) if (old[key] !== undefined && day[key] !== undefined) {
-          if (Math.abs(day[key]! - old[key]!) >= this.ctx.cfg.temperatureChange) { changed = true; dayChanges.push({ id: day[key]! > old[key]! ? 'temperatureUp' : 'temperatureDown', text: '' }); }
-          else baseline[key] = old[key];
+        const beforeMetrics = dayMetrics(old), metrics = dayMetrics(day);
+        for (const key of ['windMin', 'windMax', 'probability'] as const) {
+          const before = beforeMetrics[key], value = metrics[key];
+          if (before === undefined || value === undefined) continue;
+          const probability = key === 'probability';
+          const delta = probability ? Math.abs(Math.round(value * 100) - Math.round(before * 100)) : Math.abs(value - before);
+          if (delta >= (probability ? this.ctx.cfg.precipitationProbabilityChange : this.ctx.cfg.windScaleChange)) {
+            changed = true;
+            dayChanges.push({ id: `${probability ? 'probability' : 'wind'}${value > before ? 'Up' : 'Down'}`, text: '' });
+          }
         }
-        if (old.uv !== undefined && day.uv !== undefined && Math.floor(old.uv) !== Math.floor(day.uv)) {
-          const uvChanges = weatherChanges({ ...old.daytime, uv: old.uv }, { ...day.daytime, uv: day.uv }, this.ctx.cfg);
-          changed ||= uvChanges.changes.some(c => c.id === 'uvUp' || c.id === 'uvDown');
+        for (const key of ['min', 'max'] as const) {
+          if (day.min === undefined || day.max === undefined) { baseline[key] = old[key]; continue; }
+          if (old[key] === undefined) continue;
+          if (Math.abs(day[key]! - old[key]!) >= this.ctx.cfg.temperatureChange) { changed = true; dayChanges.push({ id: day[key]! > old[key]! ? 'temperatureUp' : 'temperatureDown', text: '' }); }
+          else if (mode !== 'summary') baseline[key] = old[key];
+        }
+        if (day.uv === undefined) baseline.uv = old.uv;
+        else if (old.uv !== undefined) {
+          if (Math.abs(day.uv - old.uv) >= UV_CHANGE) changed = true;
+          else if (mode !== 'summary') baseline.uv = old.uv;
+        }
+      }
+      if (mode === 'summary' || changed) {
+        if (day.min !== undefined && day.max !== undefined) { baseline.min = day.min; baseline.max = day.max; }
+        if (day.uv !== undefined) baseline.uv = day.uv;
+      }
+      for (const key of ['windScale', 'precipitationProbability'] as const) {
+        const hasBaseline = old && (old.daytime[key] !== undefined || old.nighttime[key] !== undefined);
+        if ((mode === 'summary' || changed || !hasBaseline) && (day.daytime[key] !== undefined || day.nighttime[key] !== undefined)) {
+          for (const part of ['daytime', 'nighttime'] as const) baseline[part][key] = day[part][key];
         }
       }
       if (changed) { changes.push({ id: 'dayChanged', text: dayLine(day) }); selection.days.set(day.date, dayChanges); }
       next.days.push(baseline);
     }
     this.previousForecast = next;
-    if (changes.length && host && this.host === host && !this.controller.signal.aborted) await this.push('realtime-weather.forecast', this.forecastReceipt(current, 'passive', changes, selection));
+    if (mode !== 'silent' && (mode === 'summary' || changes.length) && host && this.host === host) {
+      await this.push('realtime-weather.forecast', mode === 'summary' ? this.forecastReceipt(current, 'passive') : this.forecastReceipt(current, 'passive', changes, selection));
+    }
   }
   private async push(type: string, text: string): Promise<void> {
     await this.host!.pushEvent({ type, source: this.id, senderKey: this.id, origin: 'external', ts: nowIso(this.ctx.timezone), text });
@@ -235,12 +295,23 @@ export class RealtimeWeatherWorld implements World {
     }, interval);
     timer.unref(); this.timers.add(timer);
   }
+  private scheduleDailyForecast(): void {
+    const timer = setTimeout(() => {
+      this.timers.delete(timer);
+      if (!this.host) return;
+      const task = this.pollForecast('summary')
+        .catch(() => { this.host?.log.warn('每日预报未完成'); })
+        .finally(() => { this.tasks.delete(task); if (this.host) this.scheduleDailyForecast(); });
+      this.tasks.add(task);
+    }, nextDailyForecastAt(this.now(), this.timezone()) - this.now());
+    timer.unref(); this.timers.add(timer);
+  }
   private scheduleSolar(): void {
     if (!this.ctx.cfg.location || !this.host) return;
     const now = this.now(), location = this.ctx.cfg.location;
     const events: { at: number; kind: 'sunrise' | 'sunset' }[] = [];
     for (const dayOffset of [0, 1]) {
-      const times = solarTimes(now + dayOffset * 24 * 60 * 60_000, location);
+      const times = solarTimes(now + dayOffset * 24 * 60 * 60_000, location, this.timezone());
       for (const kind of ['sunrise', 'sunset'] as const) if (times[kind] && times[kind]!.getTime() > now) events.push({ at: times[kind]!.getTime(), kind });
     }
     const next = events.sort((a, b) => a.at - b.at)[0];
@@ -251,8 +322,10 @@ export class RealtimeWeatherWorld implements World {
       const run = async () => {
         if (next) {
           const at = new Date(this.now()).toISOString();
-          const atmosphere = this.ambience.render(next.kind, 'passive', at, this.timezone(), this.tags(this.current?.weather));
-          await this.push('realtime-weather.solar', [`${clock(at, this.timezone())}｜${next.kind === 'sunrise' ? '日出' : '日落'}${this.current?.weather ? `｜${this.current.weather.condition}` : ''}`, atmosphere].filter(Boolean).join('\n\n'));
+          const atmosphere = this.ambience.render(next.kind, 'passive', at, this.timezone(), this.tags(this.current?.weather), {}, this.ctx.cfg.location ?? undefined);
+          const current = this.current;
+          const stale = current?.errors.weather && current.weatherAt ? `（沿用${clock(current.weatherAt, this.timezone())}）` : '';
+          await this.push('realtime-weather.solar', [`${clock(at, this.timezone())}｜${next.kind === 'sunrise' ? '日出' : '日落'}${current?.weather ? `｜${current.weather.condition}${stale}` : ''}`, atmosphere].filter(Boolean).join('\n\n'));
         }
       };
       const task = run().catch(() => { this.host?.log.warn('日出日落事件未完成'); }).finally(() => { this.tasks.delete(task); if (this.host) this.scheduleSolar(); });
@@ -260,17 +333,29 @@ export class RealtimeWeatherWorld implements World {
     }, delay);
     timer.unref(); this.timers.add(timer);
   }
-  async start(host: WorldHost): Promise<void> {
-    this.host = host; this.controller = new AbortController(); this.ambience.start();
-    if (!this.ctx.cfg.location || !this.ctx.cfg.apiHost || !this.ctx.secret(REALTIME_WEATHER_SECRET)) return;
-    await Promise.all([this.pollCurrent(), this.pollForecast()]);
-    if (!this.host) return;
+  private async initialize(host: WorldHost): Promise<void> {
+    await Promise.all([this.pollCurrent(false), this.pollForecast('silent')]);
+    if (this.host !== host) return;
+    // Temporary workaround: startup replay can requeue an already queued persisted event.
+    host.pushDeferred({
+      type: 'realtime-weather.summary', senderKey: this.id, origin: 'external',
+      render: () => this.host === host ? [this.currentReceipt(this.current!, 'passive'), this.forecastReceipt(this.forecast!, 'passive')].join('\n\n') : null,
+    });
     this.schedule(() => this.pollCurrent(), REALTIME_WEATHER_CURRENT_INTERVAL_MS);
     this.schedule(() => this.pollForecast(), REALTIME_WEATHER_FORECAST_INTERVAL_MS);
     this.scheduleSolar();
+    this.scheduleDailyForecast();
+    this.initialized = true;
+  }
+  async start(host: WorldHost): Promise<void> {
+    this.host = host; this.controller = new AbortController(); this.ambience.start();
+    if (!this.ctx.cfg.location || this.locationError() || !this.ctx.cfg.apiHost || !this.ctx.secret(REALTIME_WEATHER_SECRET)) return;
+    // Core awaits each World's start in turn; queries run in the background so a slow API cannot hold up the bot.
+    const task = this.initialize(host).catch(() => { this.host?.log.warn('天气初始化未完成'); }).finally(() => { this.tasks.delete(task); });
+    this.tasks.add(task);
   }
   async stop(): Promise<void> {
-    this.host = undefined; this.controller.abort();
+    this.host = undefined; this.initialized = false; this.controller.abort();
     for (const timer of this.timers) clearTimeout(timer);
     this.timers.clear(); this.ambience.stop();
     await Promise.allSettled([...this.tasks]);
@@ -278,10 +363,10 @@ export class RealtimeWeatherWorld implements World {
 
   webUi(language?: Language): WorldWebUiDecl {
     const loading = !!this.currentFlight || !!this.forecastFlight || !!this.airFlight;
-    const failed = Object.keys({ ...this.current?.errors, ...this.forecast?.errors }).length > 0;
+    const failed = !!this.locationError() || Object.keys({ ...this.current?.errors, ...this.forecast?.errors }).length > 0;
     const state = loading ? 'loading' : failed ? 'error' : this.current && this.forecast ? 'online' : 'offline';
     return {
-      lamps: [{ label: 'QWeather', state, hint: state === 'online' ? '最近一次天气与预报查询成功' : state === 'error' ? '最近一次查询有接口失败' : state === 'loading' ? '正在查询天气' : '尚未完成天气与预报查询' }],
+      lamps: [{ label: 'QWeather', state, hint: state === 'online' ? '最近一次天气与预报查询成功' : state === 'error' ? this.locationError() ?? '最近一次查询有接口失败' : state === 'loading' ? '正在查询天气' : '尚未完成天气与预报查询' }],
       label: '实时天气',
       badges: [{ label: 'QWeather', value: this.ctx.secret(REALTIME_WEATHER_SECRET) ? '密钥已配置' : '密钥未配置' }, { label: '地点', value: this.ctx.cfg.location?.name ?? '未选择' }],
       panels: [{ id: 'config', title: '配置' }],
@@ -289,8 +374,9 @@ export class RealtimeWeatherWorld implements World {
       invoke: async (panel, method, args) => {
         if (panel !== 'config') throw new Error('未知面板');
         if (method === 'state') {
-          this.ambience.reload();
-          return { config: this.ctx.cfg, keySet: !!this.ctx.secret(REALTIME_WEATHER_SECRET), ambience: { file: this.ambience.file, usingDefault: this.ambience.usingDefault, error: this.ambience.error }, errors: { ...this.current?.errors, ...this.forecast?.errors }, alerts: this.client.rawAlerts, attributions: [...this.client.attributions] };
+          // Stopped worlds have no file watcher; the panel stays reachable while stopped.
+          if (!this.host) this.ambience.reload();
+          return { config: this.ctx.cfg, keySet: !!this.ctx.secret(REALTIME_WEATHER_SECRET), ambience: { file: this.ambience.file, usingDefault: this.ambience.usingDefault, error: this.ambience.error }, errors: { ...this.current?.errors, ...this.forecast?.errors, ...(this.locationError() ? { location: this.locationError() } : {}) }, alerts: this.client.rawAlerts, attributions: [...this.client.attributions] };
         }
         if (method === 'save') {
           const [key, raw] = args;
@@ -313,7 +399,10 @@ export class RealtimeWeatherWorld implements World {
         if (method === 'selectCity') {
           const selected = this.candidates.find(c => c.id === args[0]);
           if (!selected) throw new Error('请从本次搜索结果选择地点');
-          this.ctx.persist({ location: selected }); await this.ctx.restart(); return { ok: true };
+          const { id: _id, ...location } = selected;
+          // persist合并对象；先置空，避免旧地点的多余字段（如编号）留在配置中。
+          this.ctx.persist({ location: null });
+          this.ctx.persist({ location }); await this.ctx.restart(); return { ok: true };
         }
         if (method === 'openKeyFile') { await this.open(prepareKeyFile(this.ctx.botDir)); return { ok: true }; }
         if (method === 'openAmbience') { ensureParent(this.ambience.file); this.ambience.ensureFile(); await this.open(this.ambience.file); return { ok: true }; }
@@ -322,7 +411,8 @@ export class RealtimeWeatherWorld implements World {
           const start = this.now();
           const [current, forecast] = await Promise.all([this.loadCurrent(true), this.loadForecast()]);
           const result = { durationMs: this.now() - start, errors: { ...current.errors, ...forecast.errors } };
-          if (current.weather) await this.ctx.restart();
+          // Restart only to bring up a World that has not initialized; a stale cached reading is not success.
+          if (!current.errors.weather && !this.initialized) await this.ctx.restart();
           return result;
         }
         if (method === 'restart') { await this.ctx.restart(); return { ok: true }; }

@@ -1,5 +1,5 @@
 import { airCategory } from './air-quality.ts';
-import type { Location, RealtimeWeatherConfigSection } from './config.ts';
+import type { CityCandidate, RealtimeWeatherConfigSection } from './config.ts';
 import type { Air, Alert, Day, Hour, Weather } from './model.ts';
 
 interface Value { value: number; unit?: string }
@@ -73,13 +73,16 @@ export function normalizeWeather(raw: RawWeather): Weather {
 export function normalizeAlert(raw: RawAlert): Alert {
   return {
     id: raw.id, event: EVENT_CODES[raw.eventType.code] ?? EVENTS[raw.eventType.name.toLowerCase()] ?? Object.entries(EVENT_ALIASES).find(([name]) => name.toLowerCase() === raw.eventType.name.toLowerCase().replace(/[ -]/g, ''))?.[1] ?? '气象', severity: raw.severity,
-    color: raw.color?.code, urgency: raw.urgency, certainty: raw.certainty,
-    issuedAt: raw.issuedTime, effectiveAt: raw.effectiveTime, onsetAt: raw.onsetTime, expiresAt: raw.expireTime,
+    color: raw.color?.code, effectiveAt: raw.effectiveTime, onsetAt: raw.onsetTime, expiresAt: raw.expireTime,
     kind: raw.messageType.code, supersedes: raw.messageType.supersedes ?? [],
   };
 }
+/** 本分支开发期间保存的地点没有时区；不退回部署时区，要求重新选择。 */
+export const LOCATION_TIMEZONE_MISSING = '地点缺少时区，请重新选择城市或区划';
+/** 消息可直接展示给操作者的错误。 */
+export class QWeatherError extends Error {}
 export function apiBase(host: string): string {
-  if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.qweatherapi\.com$/i.test(host) || host.includes('..')) throw new Error('API Host 须为控制台提供的 qweatherapi.com 主机名');
+  if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.qweatherapi\.com$/i.test(host) || host.includes('..')) throw new QWeatherError('API Host 须为控制台提供的 qweatherapi.com 主机名');
   return `https://${host}`;
 }
 
@@ -91,55 +94,60 @@ export class QWeather {
   private async get<T>(path: string, signal?: AbortSignal): Promise<T> {
     const base = apiBase(this.cfg.apiHost.trim());
     const key = this.secret();
-    if (!key) throw new Error('密钥未配置');
+    if (!key) throw new QWeatherError('密钥未配置');
     let response: Response;
     try {
       response = await this.request(`${base}${path}`, {
         headers: { 'X-QW-Api-Key': key }, redirect: 'error',
         signal: AbortSignal.any([AbortSignal.timeout(10000), ...(signal ? [signal] : [])]),
       });
-    } catch { throw new Error('QWeather 请求未完成'); }
-    if (!response.ok) throw new Error(`QWeather HTTP ${response.status}`);
+    } catch { throw new QWeatherError('QWeather 请求未完成'); }
+    if (!response.ok) throw new QWeatherError(`QWeather HTTP ${response.status}`);
     let result: T & { metadata?: Metadata };
     try { result = await response.json() as T & { metadata?: Metadata }; }
-    catch { throw new Error('QWeather 响应格式错误'); }
+    catch { throw new QWeatherError('QWeather 响应格式错误'); }
     for (const attribution of result.metadata?.attributions ?? []) this.attributions.add(attribution);
     return result;
   }
   private point(): string {
     const location = this.cfg.location;
-    if (!location) throw new Error('尚未选择城市或区划');
+    if (!location) throw new QWeatherError('尚未选择城市或区划');
+    if (!location.timezone) throw new QWeatherError(LOCATION_TIMEZONE_MISSING);
     return `${location.latitude}/${location.longitude}`;
   }
   async current(signal?: AbortSignal): Promise<Weather> {
-    return normalizeWeather(await this.get<RawWeather>(`/weather/v1/current/${this.point()}?lang=zh`, signal));
+    const weather = normalizeWeather(await this.get<RawWeather>(`/weather/v1/current/${this.point()}?lang=zh`, signal));
+    // 累计量覆盖过去一小时；它不能在强度为零或缺失时证明当前仍在降水。
+    if (weather.precipitationIntensity === 0 || weather.precipitationIntensity === undefined && weather.precipitationAmount === 0) weather.precipitationType = 'none';
+    else if (weather.precipitationIntensity === undefined && weather.precipitationType !== 'none') weather.precipitationType = 'unknown';
+    return weather;
   }
   async hourly(signal?: AbortSignal): Promise<Hour[]> {
     const result = await this.get<{ hours: (RawWeather & { forecastTime: string })[] }>(`/weather/v1/hourly/${this.point()}?hours=3&lang=zh`, signal);
     return result.hours.map(h => ({ ...normalizeWeather(h), at: h.forecastTime }));
   }
   async daily(signal?: AbortSignal): Promise<Day[]> {
-    const result = await this.get<{ days: RawDay[] }>(`/weather/v1/daily/${this.point()}?days=${this.cfg.forecastDays}&lang=zh`, signal);
-    return result.days.map(d => ({ date: new Intl.DateTimeFormat('en-CA', { timeZone: this.cfg.location!.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(d.forecastStartTime)), daytime: normalizeWeather(d.daytime), nighttime: normalizeWeather(d.nighttime), min: d.temperatureMin?.value, max: d.temperatureMax?.value, uv: d.uvIndexMax }));
+    const result = await this.get<{ days: RawDay[] }>(`/weather/v1/daily/${this.point()}?days=${this.cfg.forecastDays}&localTime=true&lang=zh`, signal);
+    return result.days.map(d => ({ date: d.forecastStartTime.slice(0, 10), daytime: normalizeWeather(d.daytime), nighttime: normalizeWeather(d.nighttime), min: d.temperatureMin?.value, max: d.temperatureMax?.value, uv: d.uvIndexMax }));
   }
   async air(at: string, signal?: AbortSignal): Promise<Air> {
-    const result = await this.get<{ indexes: { code: string; aqiDisplay: string; level: string; category: string; primaryPollutant?: { code: string } }[]; pollutants: { code: string; concentration: Value }[] }>(`/airquality/v1/current/${this.point()}?lang=zh`, signal);
+    const result = await this.get<{ indexes: { code: string; aqiDisplay: string; level: string; category: string; primaryPollutant?: { code: string } }[] }>(`/airquality/v1/current/${this.point()}?lang=zh`, signal);
     const index = result.indexes.find(i => i.code !== 'qaqi') ?? result.indexes.find(i => i.code === 'qaqi');
-    if (!index) throw new Error('空气质量暂无数据');
+    if (!index) throw new QWeatherError('空气质量暂无数据');
     const category = airCategory(index.code, Number(index.level));
-    return { at, standard: index.code, value: index.aqiDisplay, level: Number(index.level), category, primary: POLLUTANTS[index.primaryPollutant?.code ?? ''], pm25: result.pollutants.find(p => p.code === 'pm2p5')?.concentration.value };
+    return { at, standard: index.code, value: index.aqiDisplay, level: Number(index.level), category, primary: POLLUTANTS[index.primaryPollutant?.code ?? ''] };
   }
   async alerts(signal?: AbortSignal): Promise<Alert[]> {
     const result = await this.get<{ alerts: RawAlert[] }>(`/weatheralert/v1/current/${this.point()}?lang=zh`, signal);
     this.rawAlerts = result.alerts;
     return result.alerts.map(normalizeAlert);
   }
-  async cities(query: string, filters: { adm?: string; range?: string } = {}, signal?: AbortSignal): Promise<Location[]> {
+  async cities(query: string, filters: { adm?: string; range?: string } = {}, signal?: AbortSignal): Promise<CityCandidate[]> {
     const params = new URLSearchParams({ location: query, number: '20', lang: 'zh' });
     if (filters.adm?.trim()) params.set('adm', filters.adm.trim());
     if (filters.range?.trim()) params.set('range', filters.range.trim().toLowerCase());
     const result = await this.get<{ code: string; location?: { id: string; name: string; country: string; adm1: string; adm2: string; lat: string; lon: string; tz: string }[] }>(`/geo/v2/city/lookup?${params}`, signal);
-    if (result.code !== '200') throw new Error(`城市搜索：${/^\d{3}$/.test(result.code) ? result.code : '响应错误'}`);
+    if (result.code !== '200') throw new Error(`城市搜索：${result.code}`);
     return (result.location ?? []).map(l => ({ id: l.id, name: l.name, country: l.country, province: l.adm1, city: l.adm2, latitude: Number(l.lat), longitude: Number(l.lon), timezone: l.tz }));
   }
 }

@@ -4,9 +4,61 @@ import { REALTIME_WEATHER_DEFAULTS } from '../src/config.ts';
 import type { Alert, Weather } from '../src/model.ts';
 const base: Weather = { conditionCode: '100', condition: '晴', temperature: 22, feelsLike: 22, precipitationType: 'none', visibilityKm: 8, uv: 2, windScale: 2 };
 describe('双向变化', () => {
+  it.each(['unknown', undefined])('降水类型%s不制造变化，恢复原类型不重新报起雨', unknown => {
+    const rain = { ...base, conditionCode: '307', condition: '大雨', precipitationType: 'rain' };
+    const missing = weatherChanges(rain, { ...rain, precipitationType: unknown }, REALTIME_WEATHER_DEFAULTS, true);
+    expect(missing.changes).toEqual([]);
+    expect(weatherChanges(missing.baseline, rain, REALTIME_WEATHER_DEFAULTS).changes).toEqual([]);
+    expect(weatherChanges({ ...rain, precipitationType: unknown }, rain, REALTIME_WEATHER_DEFAULTS).changes).toEqual([]);
+    expect(weatherChanges(missing.baseline, { ...rain, precipitationType: 'none' }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toEqual(['rainStopped']);
+  });
+
+  it.each([false, true])('能见度缺失不清除跨阈值基线，完整回执=%s', reset => {
+    let baseline = { ...base, visibilityKm: 5 };
+    for (const value of [0.5, 5]) {
+      const missing = weatherChanges(baseline, { ...base, visibilityKm: undefined }, REALTIME_WEATHER_DEFAULTS, reset);
+      expect(missing.baseline.visibilityKm).toBe(baseline.visibilityKm);
+      const result = weatherChanges(missing.baseline, { ...base, visibilityKm: value }, REALTIME_WEATHER_DEFAULTS);
+      expect(result.changes.map(c => c.id)).toEqual([value < 1 ? 'visibilityDown' : 'visibilityUp']);
+      baseline = result.baseline as typeof baseline;
+    }
+  });
+
+  it.each([
+    ['uv', 2, 4, 5, 'uvUp'],
+    ['temperature', 22, 24, 25, 'temperatureUp'],
+    ['feelsLike', 22, 24, 25, 'feelsLikeUp'],
+    ['windScale', 2, 3, 4, 'windUp'],
+    ['precipitationProbability', 0.1, 0.2, 0.4, 'probabilityUp'],
+  ] as const)('%s缺失一轮后仍相对最近提醒累计', (key, initial, interim, final, id) => {
+    let baseline: Weather = { ...base, [key]: initial };
+    for (const value of [interim, undefined]) {
+      const result = weatherChanges(baseline, { ...base, [key]: value }, REALTIME_WEATHER_DEFAULTS);
+      expect(result.changes).toEqual([]);
+      baseline = result.baseline;
+      expect(baseline[key]).toBe(initial);
+    }
+    const result = weatherChanges(baseline, { ...base, [key]: final }, REALTIME_WEATHER_DEFAULTS);
+    expect(result.changes.map(c => c.id)).toEqual([id]);
+  });
+
+  it.each([[2, 3], [3, 5], [6, 7], [3, 2]])('UV %s到%s的小幅变化不通知', (before, after) => {
+    expect(weatherChanges({ ...base, uv: before }, { ...base, uv: after }, REALTIME_WEATHER_DEFAULTS).changes).toEqual([]);
+  });
+  it('UV基线跨轮保留，达到3后更新，其他天气变化不重置它', () => {
+    let baseline = base;
+    const emitted: string[] = [];
+    for (const uv of [3, 2, 4, 5, 4, 3, 2]) {
+      const result = weatherChanges(baseline, { ...base, uv, temperature: 30 }, REALTIME_WEATHER_DEFAULTS);
+      emitted.push(...result.changes.filter(c => c.id.startsWith('uv')).map(c => c.text));
+      baseline = result.baseline;
+    }
+    expect(emitted).toEqual(['UV 2→5', 'UV 5→2']);
+  });
+
   it.each([
     ['ice', '999', 'precipitationStopped'], ['rain', '313', 'precipitationStopped'],
-    ['unknown', '999', 'precipitationUpdated'], ['rain', '305', 'rainStopped'],
+    ['rain', '305', 'rainStopped'],
   ])('%s/%s结束时区分特殊降水、普通雨和未知状态', (type, code, expected) => {
     const before = { ...base, conditionCode: code, precipitationType: type };
     const after = { ...before, precipitationType: 'none' };
@@ -59,6 +111,12 @@ describe('双向变化', () => {
     const rain = { ...base, conditionCode: '305', precipitationType: 'rain' };
     expect(weatherChanges(rain, { ...rain, conditionCode: '302' }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).not.toContain('rainWeaker');
     expect(weatherChanges({ ...rain, conditionCode: '300', precipitationIntensity: 1 }, { ...rain, conditionCode: '300', precipitationIntensity: 9 }, REALTIME_WEATHER_DEFAULTS).changes.map(c => c.id)).toContain('rainStronger');
+  });
+  it('同批消息互相取代时不无限追溯前序消息', () => {
+    const a: Alert = { id: 'a', event: '大风', severity: 'moderate', kind: 'update', supersedes: ['b'] };
+    const b: Alert = { ...a, id: 'b', supersedes: ['a'] };
+    const c: Alert = { ...a, id: 'c', supersedes: ['a'] };
+    expect(alertChanges([], [a, b, c], 0).map(c => c.id)).toEqual(['alertAdded']);
   });
   it('忽略未知前序取消与同批已被取代的消息，区分升级和普通更新', () => {
     const old: Alert = { id: 'a', event: '寒潮', severity: 'moderate', color: 'yellow', kind: 'alert', supersedes: [] };

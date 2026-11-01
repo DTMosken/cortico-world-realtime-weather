@@ -1,12 +1,17 @@
 import type { Alert, Current, Day, Forecast, Weather } from './model.ts';
-import { alertGrade, UV_NAMES, uvLevel } from './model.ts';
+import { alertGrade, describesPrecipitation, precipitating, UV_NAMES, uvLevel } from './model.ts';
 import { activeAlerts } from './changes.ts';
 import { clock } from './time.ts';
 
 export const airStandard = (standard: string) => standard === 'cn-mee' ? 'CN' : standard.toUpperCase();
 export const number = (n: number) => String(Math.round(n * 10) / 10);
+const PRECIPITATION_NAMES: Record<string, string> = { rain: '降雨', snow: '降雪', mixed: '雨夹雪', ice: '冰粒或冻雨' };
 export function weatherLine(w: Weather, forecast = false): string {
-  const parts = [w.condition + (w.precipitationIntensity === undefined || !['rain', 'snow', 'mixed'].includes(w.precipitationType ?? '') ? '' : `${number(w.precipitationIntensity)} mm/h`)];
+  // 实况描述与降水判断不一致时以判断为准；预报行与9xx中性描述不改。
+  const described = forecast ? undefined : describesPrecipitation(w);
+  const parts = [described && w.precipitationType === 'none' ? `${w.condition}，当前无降水`
+    : described === false && precipitating(w) ? `${w.condition}，${PRECIPITATION_NAMES[w.precipitationType!]}${number(w.precipitationIntensity!)} mm/h`
+    : w.condition + (w.precipitationIntensity === undefined || !['rain', 'snow', 'mixed', 'ice'].includes(w.precipitationType ?? '') ? '' : `${number(w.precipitationIntensity)} mm/h`)];
   if (w.temperature !== undefined) parts.push(`${number(w.temperature)}°C${w.feelsLike === undefined ? '' : `，体感${number(w.feelsLike)}°C`}`);
   else if (w.feelsLike !== undefined) parts.push(`体感${number(w.feelsLike)}°C`);
   if (w.windScale !== undefined) parts.push(`${w.windDirection ?? ''}风${w.windScale}级`);
@@ -30,18 +35,27 @@ export function currentLine(snapshot: Current, timezone: string): string {
     parts.push(`AQI(${standard}) ${air.value}（${air.category}，${clock(air.at, timezone)}）${air.primary ? `，首要${air.primary}` : ''}`);
   } else parts.push('空气质量暂无数据');
   const alerts = activeAlerts(snapshot.alerts, Date.parse(snapshot.at));
-  parts.push(snapshot.errors.alerts ? `预警${snapshot.errors.alerts}` : alerts.length ? alerts.map(a => alertLine(a, timezone)).join('；') : '无有效预警');
-  for (const kind of ['weather', 'air'] as const) if (snapshot.errors[kind]) parts.push(`${kind === 'weather' ? '天气' : '空气质量'}${snapshot.errors[kind]}`);
+  if (snapshot.errors.alerts && !snapshot.alertsAt) parts.push('预警暂无数据');
+  else parts.push((alerts.length ? alerts.map(a => alertLine(a, timezone)).join('；') : '无有效预警') + (snapshot.errors.alerts ? `（沿用${clock(snapshot.alertsAt!, timezone)}）` : ''));
+  for (const kind of ['weather', 'alerts', 'air'] as const) if (snapshot.errors[kind]) parts.push(`${{ weather: '天气', alerts: '预警', air: '空气质量' }[kind]}${snapshot.errors[kind]}`);
   return parts.join('｜');
+}
+export function dayMetrics(day: Day) {
+  const probabilities = [day.daytime.precipitationProbability, day.nighttime.precipitationProbability].filter((v): v is number => v !== undefined);
+  const winds = [day.daytime.windScale, day.nighttime.windScale].filter((v): v is number => v !== undefined);
+  return {
+    probability: probabilities.length ? Math.max(...probabilities) : undefined,
+    windMin: winds.length ? Math.min(...winds) : undefined,
+    windMax: winds.length ? Math.max(...winds) : undefined,
+  };
 }
 export function dayLine(day: Day): string {
   const parts = [day.date.slice(5).replace('-', '/'), `${day.daytime.condition}/${day.nighttime.condition}`];
   if (day.min !== undefined && day.max !== undefined) parts.push(`${number(day.min)}–${number(day.max)}°C`);
-  const probabilities = [day.daytime.precipitationProbability, day.nighttime.precipitationProbability].filter((v): v is number => v !== undefined);
+  const metrics = dayMetrics(day);
   const amounts = [day.daytime.precipitationAmount, day.nighttime.precipitationAmount].filter((v): v is number => v !== undefined);
-  if (probabilities.length) parts.push(`降水${Math.round(Math.max(...probabilities) * 100)}%${amounts.length === 2 ? `/${number(amounts[0] + amounts[1])} mm` : ''}`);
-  const winds = [day.daytime.windScale, day.nighttime.windScale].filter((v): v is number => v !== undefined);
-  if (winds.length) parts.push(`${day.daytime.windDirection ?? day.nighttime.windDirection ?? ''}风${Math.min(...winds)}${Math.max(...winds) === Math.min(...winds) ? '' : `–${Math.max(...winds)}`}级`);
+  if (metrics.probability !== undefined) parts.push(`降水${Math.round(metrics.probability * 100)}%${amounts.length === 2 ? `/${number(amounts[0] + amounts[1])} mm` : ''}`);
+  if (metrics.windMin !== undefined) parts.push(`${day.daytime.windDirection ?? day.nighttime.windDirection ?? ''}风${metrics.windMin}${metrics.windMax === metrics.windMin ? '' : `–${metrics.windMax}`}级`);
   if (day.uv !== undefined) parts.push(`UV最高${day.uv}`);
   return parts.join('｜');
 }

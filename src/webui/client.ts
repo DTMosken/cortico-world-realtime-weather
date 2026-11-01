@@ -1,5 +1,5 @@
 import type { WebUiClientBundle, WebUiPanelContext } from 'cortico/web/shared/client-panel.ts';
-import type { Location, RealtimeWeatherConfigSection } from '../config.ts';
+import type { CityCandidate, RealtimeWeatherConfigSection } from '../config.ts';
 import { realtimeWeatherConfigGroup } from '../config.ts';
 
 interface State {
@@ -14,7 +14,7 @@ interface State {
 async function mount(ctx: WebUiPanelContext): Promise<void> {
   const { ui } = ctx;
   let state = await ctx.invoke<State>('state');
-  let candidates: Location[] = [];
+  let candidates: CityCandidate[] = [];
   let search = '';
   let adm = '';
   let range = '';
@@ -103,7 +103,7 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
       if (!ready || searching || !search.trim()) return;
       searching = true; candidates = []; searchMessage = '搜索中…'; searchFailed = false; render();
       try {
-        candidates = await ctx.invoke<Location[]>('searchCities', [search.trim(), adm.trim(), range.trim()]);
+        candidates = await ctx.invoke<CityCandidate[]>('searchCities', [search.trim(), adm.trim(), range.trim()]);
         searchMessage = candidates.length ? `找到 ${candidates.length} 个地点` : '没有匹配的城市或区划，试试城市名或拼音';
       } catch (error) {
         searchMessage = error instanceof Error ? error.message : '搜索失败'; searchFailed = true;

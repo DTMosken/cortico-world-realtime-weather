@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, watchFile, unwatchFile, writeFileSync } from 'node:fs';
 import defaults from './ambience.default.json' with { type: 'json' };
+import type { Location } from './config.ts';
 import { period } from './time.ts';
 
 export interface AmbienceRule {
@@ -32,6 +33,7 @@ export class Ambience {
   start(): void {
     if (this.watching) return;
     this.watching = true;
+    this.reload();
     watchFile(this.file, { interval: 1000, persistent: false }, () => this.reload());
   }
   stop(): void { if (this.watching) unwatchFile(this.file); this.watching = false; }
@@ -44,8 +46,8 @@ export class Ambience {
     const candidates = matches.filter(r => r.priority === priority).flatMap(r => r.texts.map(text => ({ text, when: r.when })));
     return candidates.length ? candidates[Math.floor(this.random() * candidates.length)] : undefined;
   }
-  render(kind: 'current' | 'forecast' | 'sunrise' | 'sunset', trigger: 'active' | 'passive', at: string, timezone: string, tags: string[], alertTypes: Record<string, string> = {}): string {
-    const all = new Set([kind, trigger, period(at, timezone), ...tags]);
+  render(kind: 'current' | 'forecast' | 'sunrise' | 'sunset', trigger: 'active' | 'passive', at: string, timezone: string, tags: string[], alertTypes: Record<string, string> = {}, location?: Location): string {
+    const all = new Set([kind, trigger, period(at, timezone, location), ...tags]);
     const weatherTags = new Set([...all].filter(t => !t.startsWith('alert')));
     const alertTags = all;
     const complete = this.select('complete', weatherTags);
@@ -58,7 +60,7 @@ export class Ambience {
       const alertType = alertBody.when.map(tag => alertTypes[tag]).find(Boolean) ?? '气象';
       const openingTags = new Set([...alertTags].filter(t => t !== kind));
       openingTags.add('forecast');
-      alertText = `${this.select('opening', openingTags)?.text ?? ''}${alertBody.text.replace(/\{alertType\}|\[(台风\/暴雨\/雷电\/大风|暴雨\/大风\/高温|暴雨\/大风\/暴雪)\]/g, alertType)}`;
+      alertText = `${this.select('opening', openingTags)?.text ?? ''}${alertBody.text.replace(/\{alertType\}/g, alertType)}`;
     }
     const text = weatherText + alertText;
     return text ? `[${text}]` : '';

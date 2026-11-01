@@ -2,7 +2,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { weatherTags } from '../src/model.ts';
 import { Ambience } from '../src/ambience.ts';
+import defaults from '../src/ambience.default.json' with { type: 'json' };
 
 const directories: string[] = [];
 afterEach(() => { for (const dir of directories.splice(0)) rmSync(dir, { recursive: true, force: true }); });
@@ -12,6 +14,54 @@ function create() {
   return { file, copy: new Ambience(file, () => 0) };
 }
 describe('demo文案与部署覆盖', () => {
+  it('日落燥热句只匹配高温，云量减少亮堂句只匹配白昼', () => {
+    const { copy } = create();
+    const at = '2026-10-31T08:00:00Z';
+    const cool = weatherTags({ conditionCode: '104', condition: '阴', temperature: 20 });
+    expect(copy.render('sunset', 'passive', at, 'UTC', [...cool, 'cloudyOrWet'])).not.toContain('燥热');
+    const hot = weatherTags({ conditionCode: '104', condition: '阴', temperature: 33 });
+    expect(copy.render('sunset', 'passive', at, 'UTC', hot)).toContain('燥热');
+    expect(copy.render('current', 'passive', at, 'UTC', ['cloudDecreased', 'daylight'])).toContain('亮堂了不少');
+    expect(copy.render('current', 'passive', at, 'UTC', ['cloudDecreased', 'dark'])).not.toContain('亮堂了不少');
+  });
+
+  it('夏季日落前的17点不使用暮色起手', () => {
+    const { copy } = create();
+    const location = { name: 'Example', country: '', province: '', city: '', latitude: -34, longitude: 151, timezone: 'Australia/Sydney' };
+    const text = copy.render('current', 'passive', '2026-10-31T06:00:00Z', location.timezone, ['rainStarted'], {}, location);
+    expect(text).not.toContain('暮色');
+    expect(text).toContain('余光瞥见屋里的光线变了');
+  });
+
+  it('冬季日出前的08点不使用日间起手', () => {
+    const { copy } = create();
+    const location = { name: 'Example', country: '', province: '', city: '', latitude: 60.17, longitude: 24.94, timezone: 'Europe/Helsinki' };
+    const text = copy.render('current', 'passive', '2026-12-21T06:30:00Z', location.timezone, ['rainStarted'], {}, location);
+    expect(text).toContain('刚清醒过来');
+    expect(text).not.toContain('余光瞥见屋里的光线变了');
+  });
+
+  it('日落没有其他匹配句时使用兜底句', () => {
+    const { file, copy } = create();
+    const fallback = '看了一眼窗外渐沉的暮色，白天不知不觉又过去了，顺手拉上了半边窗帘。';
+    const at = '2026-10-31T08:00:00Z';
+    expect(copy.render('sunset', 'passive', at, 'UTC', weatherTags({ conditionCode: '502', condition: '霾' }))).toBe(`[${fallback}]`);
+    const clear = new Ambience(file, () => 0.999).render('sunset', 'passive', at, 'UTC', weatherTags({ conditionCode: '100', condition: '晴' }));
+    expect(clear).not.toContain(fallback);
+    expect(clear).not.toBe('');
+  });
+
+  it('大雨缺失强度不套小雨句，高UV低温不套热浪句', () => {
+    const { copy } = create();
+    const rain = weatherTags({ conditionCode: '307', condition: '大雨', precipitationType: 'rain' });
+    expect(rain).toContain('heavyRain'); expect(rain).not.toContain('lightRain');
+    expect(copy.render('current', 'active', '2026-10-31T12:00:00Z', 'UTC', rain)).not.toContain('细密的雨丝');
+    const clear = weatherTags({ conditionCode: '100', condition: '晴', temperature: 5, feelsLike: 5, uv: 8 });
+    expect(copy.render('current', 'active', '2026-10-31T12:00:00Z', 'UTC', [...clear, 'daylight'])).not.toContain('热浪');
+    expect(weatherTags({ conditionCode: '100', condition: '晴', temperature: 33 })).toContain('hot');
+    expect(weatherTags({ conditionCode: '399', condition: '雨', precipitationType: 'rain' })).toEqual(['rain']);
+  });
+
   it('开始下雨按demo拼装；日间UV跨级匹配普通及极值候选', () => {
     const { copy } = create();
     const text = copy.render('current', 'passive', '2026-10-31T14:15:00Z', 'UTC', ['rainStarted']);
@@ -94,6 +144,7 @@ describe('demo文案与部署覆盖', () => {
     const copy = new Ambience(file, () => 0.999);
     expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvUp', 'highUv', 'daylight'])).toContain('格外毒辣');
     expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvDown', 'lowUv', 'daylight'])).toContain('光线变得柔和舒适');
-    expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvDown', 'daylight'])).toContain('伸手拉开窗帘');
+    const ordinary = defaults.rules.find(r => r.id === 'body-current-uvDown-lowUv-daylight-1')!;
+    expect(copy.render('current', 'passive', '2026-10-31T12:00:00Z', 'UTC', ['uvDown', 'daylight'])).toContain(ordinary.texts.at(-1)!);
   });
 });

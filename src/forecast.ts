@@ -17,7 +17,6 @@ export function forecastTags(forecast: Forecast, current: Weather | undefined, c
   const visible = hours.slice(0, 2);
   const days = forecast.errors.days ? [] : forecast.days;
   const today = dateKey(Date.parse(forecast.at), timezone);
-  const wet = (w: Weather) => ['rain', 'snow', 'mixed'].includes(w.precipitationType ?? '');
   for (const [index, hour] of visible.entries()) {
     const changes = selection?.hours.get(hour.at);
     if (selection && !changes) continue;
@@ -62,7 +61,7 @@ export function forecastTags(forecast: Forecast, current: Weather | undefined, c
     const changes = selection?.days.get(day.date);
     if (selection && !changes) continue;
     const deltas = (['min', 'max'] as const).flatMap(key => day[key] !== undefined && before[key] !== undefined ? [day[key]! - before[key]!] : []);
-    if (deltas.some(delta => delta <= -threshold) && (!changes || changes.some(c => c.id === 'temperatureDown'))) tags.add('forecastCold');
+    if (deltas.some(delta => delta <= -threshold) && (!changes || changes.some(c => c.id === 'temperatureDown'))) tags.add('forecastDailyCold');
   }
   const futureDays = days.filter(day => day.date > today);
   // "一路上涨" requires a multi-day rising run, not one isolated warmer day.
@@ -79,7 +78,7 @@ export function forecastTags(forecast: Forecast, current: Weather | undefined, c
   }
   for (const [tag, matches] of [
     ['forecastWet', (day: typeof days[number]) => day.daytime.precipitationType === 'rain' || day.nighttime.precipitationType === 'rain'],
-    ['forecastClear', (day: typeof days[number]) => weatherTags(day.daytime).includes('clear') && !wet(day.nighttime)],
+    ['forecastClear', (day: typeof days[number]) => weatherTags(day.daytime).includes('clear') && day.nighttime.precipitationType === 'none'],
   ] as const) {
     const run: typeof days = [];
     for (const day of futureDays) { if (!matches(day)) break; run.push(day); }
