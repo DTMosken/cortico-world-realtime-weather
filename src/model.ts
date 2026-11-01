@@ -74,6 +74,14 @@ export function conditionCode(code: string): string {
   return ({ '150': '100', '151': '101', '152': '102', '153': '103', '350': '300', '351': '301', '456': '406', '457': '407' } as Record<string, string>)[code] ?? code;
 }
 
+/** 天气描述是否属降水类：300–499 为是，1xx、5xx 为否，9xx 不判断。 */
+export function describesPrecipitation(w: Weather): boolean | undefined {
+  const code = Number(w.conditionCode);
+  return code >= 300 && code < 500 ? true : code < 600 ? false : undefined;
+}
+/** 降水判断已确认正在降水；unknown 与 none 都不算。 */
+export const precipitating = (w: Weather) => ['rain', 'snow', 'mixed', 'ice'].includes(w.precipitationType ?? '');
+
 export function weatherTags(w: Weather): string[] {
   const code = Number(w.conditionCode);
   const tags: string[] = [];

@@ -1,12 +1,17 @@
 import type { Alert, Current, Day, Forecast, Weather } from './model.ts';
-import { alertGrade, UV_NAMES, uvLevel } from './model.ts';
+import { alertGrade, describesPrecipitation, precipitating, UV_NAMES, uvLevel } from './model.ts';
 import { activeAlerts } from './changes.ts';
 import { clock } from './time.ts';
 
 export const airStandard = (standard: string) => standard === 'cn-mee' ? 'CN' : standard.toUpperCase();
 export const number = (n: number) => String(Math.round(n * 10) / 10);
+const PRECIPITATION_NAMES: Record<string, string> = { rain: '降雨', snow: '降雪', mixed: '雨夹雪', ice: '冰粒或冻雨' };
 export function weatherLine(w: Weather, forecast = false): string {
-  const parts = [w.condition + (w.precipitationIntensity === undefined || !['rain', 'snow', 'mixed'].includes(w.precipitationType ?? '') ? '' : `${number(w.precipitationIntensity)} mm/h`)];
+  // 实况描述与降水判断不一致时以判断为准；预报行与9xx中性描述不改。
+  const described = forecast ? undefined : describesPrecipitation(w);
+  const parts = [described && w.precipitationType === 'none' ? `${w.condition}，当前无降水`
+    : described === false && precipitating(w) ? `${w.condition}，${PRECIPITATION_NAMES[w.precipitationType!]}${number(w.precipitationIntensity!)} mm/h`
+    : w.condition + (w.precipitationIntensity === undefined || !['rain', 'snow', 'mixed', 'ice'].includes(w.precipitationType ?? '') ? '' : `${number(w.precipitationIntensity)} mm/h`)];
   if (w.temperature !== undefined) parts.push(`${number(w.temperature)}°C${w.feelsLike === undefined ? '' : `，体感${number(w.feelsLike)}°C`}`);
   else if (w.feelsLike !== undefined) parts.push(`体感${number(w.feelsLike)}°C`);
   if (w.windScale !== undefined) parts.push(`${w.windDirection ?? ''}风${w.windScale}级`);

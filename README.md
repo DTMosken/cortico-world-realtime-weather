@@ -23,6 +23,8 @@ Cortico World扩展，使用QWeather获取天气、空气质量、官方预警�
 
 实况降水结合类型、当前强度和过去一小时累计量判断：强度为0时视为无降水，大于0时保留接口降水类型；强度缺失时，接口类型明确为无降水或累计量为0仍视为无降水；其余情况视为未知，不仅凭累计量报起停。未知状态保留上次降水基线，小时与逐日预报保持原统计口径。
 
+实况回执与上述判断一致。数据行中，降水类天气描述（代码300–499）在确认无降水时写作“小雨，当前无降水”，确认降水时照常附强度；晴、云、雾、霾、沙尘等描述在确认降水时附降水类型与强度，如“阴，降雨0.3 mm/h”，冰粒或冻雨同理；降水未知时只显示描述，9xx描述不变。天气描述变为降水类（含降水类内部变化，如小雨转雷阵雨）而未确认降水，或由降水类转为非降水类而未确认无降水时，不通知该描述变化，变化基线保留原描述，待降水确认开始或停止后与起停一并通知；出现雷阵雨同此规则，雷阵雨转普通雨只在确认降水时通知。实况氛围只在确认降水时使用`thunder`雷雨文案。
+
 温度/体感变化默认3°C，风力变化2级，能见度跨越1 km，UV相对上次提醒基线累计升降达到3时提醒，等级仅用于展示和选句；空气质量跨等级时双向提醒。降水类型、雨雪强度、晴阴转换和预警生命周期变化也会触发。预报降水概率变化阈值为30个百分点。逐日风力比较回执中的最低/最高风力，降水概率比较昼夜最高值，不按未展示的昼夜分项触发。阈值在配置页修改，下次轮询使用新值。
 
 第三小时尚未进入展示窗口时保留原比较基线，进入未来两小时范围后再判断变化。逐小时与逐日预报都按配置的温差阈值提醒；不单独提醒预测温度微调。
@@ -52,7 +54,7 @@ JSON契约见`src/ambience.schema.json`。`rules`中的`part`为`opening`（起�
 
 - 查询：`current`、`forecast`、`active`、`passive`。
 - 当地时段按地点计算：民用晨光开始与05:00中较早者至日出为`morning`，日出至日落为`day`，日落至民用暮光结束为`evening`，之后至23:30为`night`，再后至清晨为`lateNight`。白夜没有民用暮光结束时，日落至23:30为`evening`，之后为`lateNight`。跨午夜延续的`day`与`evening`按上一日日落与民用暮光结束。极昼极夜没有日出日落，08:00前沿用固定时段（05:00–08:00为`morning`，05:00前为`lateNight`），08:00以后极昼使用`day`，极夜使用`night`/`lateNight`。`daylight`/`dark`按太阳位置判断。
-- 静态天气：`clear`、`cloudy`、`lightRain`、`heavyRain`、`lightSnow`、`heavySnow`、`mixed`、`thunder`、`fog`、`polluted`、`windy`、`freezing`、`hot`、`humidHot`。
+- 静态天气：`clear`、`cloudy`、`lightRain`、`heavyRain`、`lightSnow`、`heavySnow`、`mixed`、`thunder`（实况须确认降水）、`fog`、`polluted`、`windy`、`freezing`、`hot`、`humidHot`。
 - 变化：`becameClear`、`becameCloudy`、`conditionChanged`、`rainStarted`、`rainStopped`、`rainStronger`、`rainWeaker`、`snowStarted`、`snowStopped`、`snowStronger`、`snowWeaker`、`rainToSnow`、`snowToRain`、`precipitationChanged`、`temperatureUp/Down`、`feelsLikeUp/Down`、`windUp/Down`、`visibilityUp/Down`、`uvUp/Down`、`airUp/Down`、`probabilityUp/Down`。`Up/Down`各为独立标签。被动事件只向文案提供本轮变化标签。
 - UV补充条件：`highUv` ≥7、`lowUv` ≤2。空气改善补充条件`clearerAir`表示当前AQI达到对应标准的良好类别，且能见度高于本段污染开始时；中间改善轮次不前移该基线。
 - 通用空气改善句使用 `goodAir` 和 `clearAirWeather`（当前晴或云类天气），不限制视程是否提升；当前仍为霾、沙尘或雾时不套开窗句。

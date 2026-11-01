@@ -13,7 +13,7 @@ import { alertChanges, UV_CHANGE, weatherChanges } from './changes.ts';
 import { clock, isDaylight, solarTimes, nextDailyForecastAt } from './time.ts';
 import { forecastTags, type ForecastSelection } from './forecast.ts';
 import { airStandard, currentLine, dayLine, dayMetrics, forecastLines } from './format.ts';
-import { weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
+import { describesPrecipitation, precipitating, weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
 import { ensureParent, openFile, prepareKeyFile } from './files.ts';
 
 const ENV_PROMPT_FILE = fileURLToPath(new URL('./ENV_PROMPT.md', import.meta.url));
@@ -83,7 +83,8 @@ export class RealtimeWeatherWorld implements World {
   private timezone(): string { return this.ctx.cfg.location?.timezone ?? this.ctx.timezone; }
   private locationError(): string | undefined { return this.ctx.cfg.location && !this.ctx.cfg.location.timezone ? LOCATION_TIMEZONE_MISSING : undefined; }
   private tags(weather?: Weather): string[] {
-    return [...(weather ? weatherTags(weather) : []), ...(this.ctx.cfg.location && isDaylight(this.now(), this.ctx.cfg.location) ? ['daylight'] : ['dark']), ...((weather?.windScale ?? 0) < 4 ? ['calm'] : []), ...(weather && (THICK_CLOUD.includes(weather.conditionCode) || weatherTags(weather).includes('fog') || ['rain', 'snow', 'mixed'].includes(weather.precipitationType ?? '')) ? ['cloudyOrWet'] : [])];
+    // 雷雨文案须有确认降水；weatherTags() 本身不改，起停判断仍按描述识别雷阵雨。
+    return [...(weather ? weatherTags(weather).filter(t => t !== 'thunder' || precipitating(weather)) : []), ...(this.ctx.cfg.location && isDaylight(this.now(), this.ctx.cfg.location) ? ['daylight'] : ['dark']), ...((weather?.windScale ?? 0) < 4 ? ['calm'] : []), ...(weather && (THICK_CLOUD.includes(weather.conditionCode) || weatherTags(weather).includes('fog') || ['rain', 'snow', 'mixed'].includes(weather.precipitationType ?? '')) ? ['cloudyOrWet'] : [])];
   }
   private currentReceipt(current: Current, trigger: 'active' | 'passive', changes?: Change[]): string {
     const weather = current.errors.weather ? undefined : current.weather;
@@ -169,8 +170,11 @@ export class RealtimeWeatherWorld implements World {
     const changes: Change[] = [];
     if (current.weather && !current.errors.weather) {
       if (this.weatherBaseline) {
-        const result = weatherChanges(this.weatherBaseline, current.weather, this.ctx.cfg);
-        changes.push(...result.changes); this.weatherBaseline = result.baseline;
+        const before = this.weatherBaseline, weather = current.weather;
+        // 描述变化须与降水判断一致：变为降水类（含降水类内部变化）须确认降水，降水类转非降水类须确认无降水；未确认前沿用基线描述，确认后与起停一并通知。
+        const held = describesPrecipitation(weather) && !precipitating(weather) || describesPrecipitation(before) && describesPrecipitation(weather) === false && weather.precipitationType !== 'none';
+        const result = weatherChanges(before, held ? { ...weather, conditionCode: before.conditionCode, condition: before.condition } : weather, this.ctx.cfg);
+        changes.push(...result.changes.filter(c => c.id !== 'thunderToRain' || precipitating(weather))); this.weatherBaseline = result.baseline;
       } else this.weatherBaseline = current.weather;
     }
     if (this.previous?.air && current.air && current.air.standard === this.previous.air.standard && current.air.level !== this.previous.air.level) changes.push({ id: current.air.level > this.previous.air.level ? 'airDown' : 'airUp', text: `AQI(${airStandard(current.air.standard)}) ${this.previous.air.value}（${this.previous.air.category}）→${current.air.value}（${current.air.category}，${clock(current.air.at, this.timezone())}）` });

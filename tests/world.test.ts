@@ -39,6 +39,127 @@ describe('实况与预报合并', () => {
     expect(fixture.events).toHaveLength(2);
   });
 
+  // 实况回执与降水判断一致：逐轮实况后返回通知的数据部分与主动查询回执。
+  const reading = (code: string, intensity?: number, type = 'rain', amount = intensity) => weather({
+    condition: { code }, precipitation: { type, ...(intensity === undefined ? {} : { intensity: { value: intensity } }), ...(amount === undefined ? {} : { amount: { value: amount } }) },
+  });
+  const observe = async (...steps: ReturnType<typeof weather>[]) => {
+    await fixture?.close();
+    // 同优先级候选中雷雨句排在小雨句之后，取末位候选才能检出雷雨句是否参选。
+    fixture = await service('Australia/Sydney', false, () => 0.99);
+    fixture.current = steps[0];
+    await fixture.start(); fixture.events.length = 0;
+    for (const step of steps.slice(1)) { fixture.current = step; await fixture.world.pollCurrent(); }
+    const active = String(await fixture.world.tools()[0].handler({}, {} as never));
+    return { notices: fixture.events.map(e => e.text!.split('\n\n')[0].replace(/^\d\d:\d\d｜/, '')), line: active.split('\n\n')[0], active };
+  };
+  const overcast = reading('104', 0, 'none');
+  const THUNDER_TEXT = '窗外闪过一道白光';
+  const ATMOSPHERE_CLEAR_RAIN = '[走到窗边，拨开窗帘确认了一下外面的情况，外面飘着细密的雨丝，路面已经被润湿成了深色。]';
+
+  it('第1行：小雨0.5→小雨0 通知雨停了，数据行标明当前无降水', async () => {
+    const { notices, line } = await observe(reading('305', 0.5), reading('305', 0));
+    expect(notices).toEqual(['雨停了']);
+    expect(line).toContain('｜小雨，当前无降水｜');
+  });
+  it('第2行：雷阵雨0.5→雷阵雨0 只通知雨停了，数据行标明当前无降水且不用雷雨文案', async () => {
+    const { notices, line, active } = await observe(reading('302', 0.5), reading('302', 0));
+    expect(notices).toEqual(['雨停了']);
+    expect(line).toContain('｜雷阵雨，当前无降水｜');
+    expect(active).not.toContain(THUNDER_TEXT);
+  });
+  it('第3行：阴0→小雨0 不通知，数据行标明当前无降水', async () => {
+    const { notices, line } = await observe(overcast, reading('305', 0));
+    expect(notices).toEqual([]);
+    expect(line).toContain('｜小雨，当前无降水｜');
+  });
+  it('第4行：接第3行小雨0→小雨0.5 以保留的阴为基线通知描述变化与开始下雨', async () => {
+    const { notices, line } = await observe(overcast, reading('305', 0), reading('305', 0.5));
+    expect(notices).toEqual(['阴→小雨｜开始下雨']);
+    expect(line).toContain('｜小雨0.5 mm/h｜');
+  });
+  it('第5行：阴0→雷阵雨0 不通知描述变化或出现雷阵雨，数据行标明当前无降水', async () => {
+    const { notices, line, active } = await observe(overcast, reading('302', 0));
+    expect(notices).toEqual([]);
+    expect(line).toContain('｜雷阵雨，当前无降水｜');
+    expect(active).not.toContain(THUNDER_TEXT);
+  });
+  it('第6行：小雨0.5→阴0.3 不通知且基线保持小雨，数据行显示降雨强度', async () => {
+    const { notices, line } = await observe(reading('305', 0.5), reading('104', 0.3));
+    expect(notices).toEqual([]);
+    expect(line).toContain('｜阴，降雨0.3 mm/h｜');
+    expect((await observe(reading('305', 0.5), reading('104', 0.3), reading('104', 0))).notices).toEqual(['小雨→阴｜雨停了']);
+  });
+  it('第7行：阴0→阴0.2 通知开始下雨，数据行显示降雨强度', async () => {
+    const { notices, line } = await observe(overcast, reading('104', 0.2));
+    expect(notices).toEqual(['开始下雨']);
+    expect(line).toContain('｜阴，降雨0.2 mm/h｜');
+  });
+  it('第8行：晴0.2 数据行显示降雨强度，文案不变', async () => {
+    const { line, active } = await observe(reading('100', 0.2));
+    expect(line).toContain('｜晴，降雨0.2 mm/h｜');
+    expect(active.split('\n\n')[1]).toBe(ATMOSPHERE_CLEAR_RAIN);
+  });
+  it('第9行：小雨强度缺失、累计0 数据行标明当前无降水', async () => {
+    expect((await observe(reading('305', undefined, 'rain', 0))).line).toContain('｜小雨，当前无降水｜');
+  });
+  it('第10行：小雨强度缺失、累计0.3 判为unknown，不通知，数据行只显示描述', async () => {
+    const { notices, line } = await observe(reading('305', 0.5), reading('305', undefined, 'rain', 0.3));
+    expect(notices).toEqual([]);
+    expect(line).toContain('｜小雨｜');
+    expect((await observe(overcast, reading('305', undefined, 'rain', 0.3))).notices).toEqual([]);
+  });
+  it('第11行：阴0→小雨0.5 通知描述变化与开始下雨', async () => {
+    expect((await observe(overcast, reading('305', 0.5))).notices).toEqual(['阴→小雨｜开始下雨']);
+  });
+  it('第12行：小雨0.5→阴0 通知描述变化与雨停了', async () => {
+    expect((await observe(reading('305', 0.5), overcast)).notices).toEqual(['小雨→阴｜雨停了']);
+  });
+  it('第13行：雷阵雨0.5 数据行显示强度并配雷雨文案', async () => {
+    const { line, active } = await observe(reading('302', 0.5));
+    expect(line).toContain('｜雷阵雨0.5 mm/h｜');
+    expect(active).toContain(THUNDER_TEXT);
+  });
+  it('第14行：未知加冰粒0.2→未知加无降水0 按强度通知起停', async () => {
+    const { notices, line } = await observe(reading('999', 0.2, 'ice'), reading('999', 0, 'none'));
+    expect(notices).toEqual(['特殊降水停止']);
+    expect(line).toContain('｜未知｜');
+  });
+  it('雪与雨相同：描述先变不通知，确认后与起停一并通知；非降水描述显示降雪强度', async () => {
+    const held = await observe(overcast, reading('400', 0, 'snow'));
+    expect(held.notices).toEqual([]);
+    expect(held.line).toContain('｜小雪，当前无降水｜');
+    expect((await observe(overcast, reading('400', 0, 'snow'), reading('400', 0.3, 'snow'))).notices).toEqual(['阴→小雪｜开始下雪']);
+    const cloudy = await observe(overcast, reading('104', 0.3, 'snow'));
+    expect(cloudy.notices).toEqual(['开始下雪']);
+    expect(cloudy.line).toContain('｜阴，降雪0.3 mm/h｜');
+  });
+  it.each([['mixed', '雨夹雪'], ['ice', '冰粒或冻雨']])('非降水描述确认%s时数据行显示%s强度', async (type, name) => {
+    expect((await observe(reading('104', 0.3, type))).line).toContain(`｜阴，${name}0.3 mm/h｜`);
+  });
+  it('冻雨描述确认冰粒或冻雨时数据行附强度', async () => {
+    expect((await observe(reading('313', 0.4, 'ice'))).line).toContain('｜冻雨0.4 mm/h｜');
+  });
+  it('雷阵雨转普通雨只在确认降水时通知', async () => {
+    expect((await observe(reading('302', 0.5), reading('305', 0))).notices).toEqual(['雨停了']);
+    expect((await observe(reading('302', 0.5), reading('305', 0.5))).notices).toEqual(['雷阵雨→小雨｜雷阵雨转普通雨']);
+  });
+  it.each([
+    ['小雨0.5→雷阵雨0', [reading('305', 0.5), reading('302', 0)], ['雨停了']],
+    ['小雪0.3→雷阵雨0', [reading('400', 0.3, 'snow'), reading('302', 0)], ['雪停了']],
+    ['小雨0→雷阵雨0', [reading('305', 0), reading('302', 0)], []],
+    ['小雨0.5→中雨0', [reading('305', 0.5), reading('306', 0)], ['雨停了']],
+  ])('降水类内部描述变化未确认降水时不通知描述与雷阵雨：%s', async (_name, steps, expected) => {
+    const { notices, line, active } = await observe(...steps);
+    expect(notices).toEqual(expected);
+    expect(line).toContain('，当前无降水｜');
+    expect(fixture!.events.map(e => e.text).join('')).not.toContain('闷雷');
+    expect(active).not.toContain(THUNDER_TEXT);
+  });
+  it('降水类内部描述变化待确认降水后与起停一并通知', async () => {
+    expect((await observe(reading('305', 0.5), reading('302', 0), reading('302', 0.5))).notices).toEqual(['雨停了', '小雨→雷阵雨｜出现雷阵雨｜开始下雨']);
+  });
+
   it.each(['预警发布', '降水概率'])('天气仍阴、仅%s变化时不夹带静态厚云句', async (change) => {
     fixture = await service();
     await fixture.start(); fixture.events.length = 0;
@@ -51,7 +172,7 @@ describe('实况与预报合并', () => {
     expect(fixture.events).toHaveLength(1);
     expect(fixture.events[0].type).toBe('realtime-weather.changed');
     expect(fixture.events[0].text).toContain(change);
-    expect(fixture.events[0].text).not.toContain('厚重的云层压得很低');
+    expect(fixture.events[0].text).not.toContain('天空被大片的云彩占满了');
   });
 
   it.each([
@@ -64,8 +185,8 @@ describe('实况与预报合并', () => {
     const summary = fixture.events.find(e => e.type === 'realtime-weather.summary')!.text!;
     const active = String(await fixture.world.tools()[0].handler({}, {} as never));
     for (const text of [summary, active]) {
-      if (thick) expect(text).toContain('厚重的云层压得很低');
-      else expect(text).not.toContain('厚重的云层压得很低');
+      if (thick) expect(text).toContain('天空被大片的云彩占满了');
+      else expect(text).not.toContain('天空被大片的云彩占满了');
     }
   });
 
