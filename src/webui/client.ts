@@ -20,6 +20,8 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
   let range = '';
   let message = '';
   let failed = false;
+  let settingsMessage = '';
+  let settingsFailed = false;
   let searching = false;
   let searchMessage = '';
   let searchFailed = false;
@@ -41,10 +43,17 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
     const sheet = ui.sheet({ title: 'QWeather 连接' });
     const locationSheet = ui.sheet({ title: '地点' });
     const copySheet = ui.sheet({ title: '氛围文案' });
-    const settings = ui.foldSheet('weather-settings', { title: '预报与提醒阈值', defaultOpen: false });
-    const settingsGrid = ui.h('div');
-    settingsGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 24px';
-    settings.body.append(settingsGrid);
+    const settings = ui.foldSheet('weather-settings', { title: '预报与提醒', defaultOpen: false });
+    function fieldGrid(): HTMLDivElement {
+      const grid = ui.h('div');
+      grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,max(240px,45%)),1fr));gap:4px 24px';
+      return grid;
+    }
+    const intervals = fieldGrid(), daily = fieldGrid(), thresholds = fieldGrid();
+    settings.body.style.cssText = 'display:grid;gap:8px';
+    const thresholdTitle = ui.section('变化阈值');
+    thresholdTitle.style.marginBlock = '8px 0';
+    settings.body.append(intervals, daily, thresholdTitle, thresholds);
     layout.append(sheet.el, locationSheet.el, settings.el, copySheet.el);
     const ready = !!state.config.apiHost && state.keySet;
     const buttons = ui.rowbar();
@@ -64,22 +73,41 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
     test.disabled = !ready || !state.config.location;
     buttons.append(test, status);
 
+    async function save(key: string, value: string | number | boolean): Promise<void> {
+      const connection = key === 'apiHost';
+      let error = '';
+      try {
+        await ctx.invoke('save', [key, value]);
+        state = await ctx.invoke<State>('state');
+      } catch (cause) { error = cause instanceof Error ? cause.message : '保存失败'; }
+      if (connection) { message = error || '已保存'; failed = !!error; }
+      else { settingsMessage = error || '已保存'; settingsFailed = !!error; }
+      render();
+    }
     const group = realtimeWeatherConfigGroup(ctx.language);
     for (const [path, property] of Object.entries(group.schema.properties)) {
       if (property.type === 'object') continue;
       const key = path.split('.').at(-1) as keyof RealtimeWeatherConfigSection;
-      const control = ui.input({ type: property.type === 'string' ? 'text' : 'number', value: String(state.config[key]), onChange: async value => {
-        try {
-          await ctx.invoke('save', [key, property.type === 'string' ? value.trim() : Number(value)]);
-          state = await ctx.invoke<State>('state'); message = '已保存'; failed = false; render();
-        } catch (error) { message = error instanceof Error ? error.message : '保存失败'; failed = true; render(); }
+      if (key === 'alignChecksToClock') {
+        intervals.after(ui.checkbox(property.title, { checked: state.config[key], onChange: checked => { void save(key, checked); } }).el);
+        continue;
+      }
+      const control = ui.input({ type: property.type === 'string' ? 'text' : 'number', value: String(state.config[key]), onChange: value => {
+        if (control.reportValidity()) void save(key, property.type === 'string' ? value.trim() : Number(value));
       } });
+      if (key === 'dailyForecastTime') control.type = 'time';
+      if (key !== 'apiHost') control.required = true;
       if (property.minimum !== undefined) control.min = String(property.minimum);
       if (property.maximum !== undefined) control.max = String(property.maximum);
-      control.step = property.type === 'integer' ? '1' : 'any';
+      if (control.type === 'number') control.step = property.type === 'integer' ? '1' : 'any';
       if (key === 'apiHost') control.placeholder = '例如 xxxxx.qweatherapi.com';
-      (key === 'apiHost' ? sheet.body : settingsGrid).append(ui.field(property.title + (property['x-suffix'] ? ` (${property['x-suffix']})` : ''), control));
+      const label = property.title + (property['x-suffix'] ? `（${property['x-suffix']}）` : '');
+      const parent = key === 'apiHost' ? sheet.body
+        : key === 'currentIntervalMinutes' || key === 'forecastIntervalMinutes' ? intervals
+        : key === 'dailyForecastTime' || key === 'forecastDays' ? daily : thresholds;
+      parent.append(ui.field(label, control));
     }
+    if (settingsMessage) settings.body.append(ui.msgline(settingsMessage, settingsFailed));
     sheet.body.append(buttons);
     const help = ui.foldSheet('qweather-registration', { title: '如何取得密钥', defaultOpen: false });
     const registration = ui.h('a', null, '注册QWeather账号'); registration.href = 'https://id.qweather.com/'; registration.target = '_blank'; registration.rel = 'noopener noreferrer';

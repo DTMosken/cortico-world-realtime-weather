@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clock, dateKey, period, isDaylight, solarTimes, nextDailyForecastAt } from '../src/time.ts';
+import { clock, dateKey, period, isDaylight, solarTimes, nextAlignedCheckAt, nextDailyForecastAt } from '../src/time.ts';
 import type { Location } from '../src/config.ts';
 const location: Location = { name: 'Example', country: 'Example', province: '', city: '', latitude: -34, longitude: 151, timezone: 'Australia/Sydney' };
 describe('地点时区与天文', () => {
@@ -62,7 +62,17 @@ describe('地点时区与天文', () => {
     ['2026-04-03T21:00:00Z', 'Australia/Sydney', '2026-04-04T22:00:00Z'],
     ['2026-10-31T02:00:00Z', 'Asia/Kathmandu', '2026-10-31T02:15:00Z'],
   ])('每日08:00按时区重算：%s %s', (now, timezone, expected) => {
-    expect(nextDailyForecastAt(Date.parse(now), timezone)).toBe(Date.parse(expected));
+    expect(nextDailyForecastAt(Date.parse(now), timezone, '08:00')).toBe(Date.parse(expected));
+  });
+  it('检查按当地午夜划分刻度，忽略启动秒数与请求耗时', () => {
+    const now = Date.parse('2026-11-08T04:22:36Z'); // 加德满都 10:07:36
+    expect(nextAlignedCheckAt(now, 'Asia/Kathmandu', 15)).toBe(Date.parse('2026-11-08T04:30:00Z'));
+    expect(nextAlignedCheckAt(now, 'Asia/Kathmandu', 120)).toBe(Date.parse('2026-11-08T06:15:00Z'));
+    expect(nextAlignedCheckAt(Date.parse('2026-11-08T23:59Z'), 'UTC', 17)).toBe(Date.parse('2026-11-09T00:00Z'));
+  });
+  it('每日预报跳过不存在的当地时间，回拨时只取第一次', () => {
+    expect(nextDailyForecastAt(Date.parse('2026-10-03T14:00Z'), 'Australia/Sydney', '02:15')).toBe(Date.parse('2026-10-04T15:15Z'));
+    expect(nextDailyForecastAt(Date.parse('2026-04-04T15:15Z'), 'Australia/Sydney', '02:15')).toBe(Date.parse('2026-04-05T16:15Z'));
   });
   it('按地点时区跨日期，并应用夏令时', () => {
     expect(clock('2026-10-31T14:15:00Z', 'Australia/Sydney')).toBe('01:15');

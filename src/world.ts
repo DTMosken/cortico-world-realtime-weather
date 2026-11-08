@@ -10,7 +10,7 @@ import { REALTIME_WEATHER_SECRET, realtimeWeatherConfigGroup, type CityCandidate
 import { apiBase, LOCATION_TIMEZONE_MISSING, QWeather, QWeatherError } from './qweather.ts';
 import { Ambience } from './ambience.ts';
 import { alertChanges, UV_CHANGE, weatherChanges } from './changes.ts';
-import { clock, isDaylight, solarTimes, nextDailyForecastAt } from './time.ts';
+import { clock, isDaylight, solarTimes, nextAlignedCheckAt, nextDailyForecastAt } from './time.ts';
 import { forecastTags, type ForecastSelection } from './forecast.ts';
 import { airStandard, currentLine, dayLine, dayMetrics, forecastLines } from './format.ts';
 import { describesPrecipitation, precipitating, weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
@@ -24,6 +24,7 @@ export const REALTIME_WEATHER_TOOL_DECLS: ReadonlyArray<Omit<ToolDef, 'handler'>
   { name: 'realtime_weather_forecast', description: '查看未来第1、第2小时与多日天气预报；明天天气取逐日摘要。', tags: ['read'], parameters: { type: 'object', properties: {}, additionalProperties: false } },
 ];
 type ForecastPollMode = 'changes' | 'summary' | 'silent';
+type WeatherSchedule = 'current' | 'forecast' | 'daily';
 interface ForecastPoll { mode: ForecastPollMode; promise: Promise<void> }
 
 export interface RealtimeWeatherWorldOptions {
@@ -45,6 +46,7 @@ export class RealtimeWeatherWorld implements World {
   private host?: WorldHost;
   private controller = new AbortController();
   private timers = new Set<ReturnType<typeof setTimeout>>();
+  private schedules = new Map<WeatherSchedule, ReturnType<typeof setTimeout>>();
   private tasks = new Set<Promise<unknown>>();
   private currentFlight?: Promise<Current>;
   private airFlight?: Promise<PromiseSettledResult<Air>>;
@@ -286,25 +288,23 @@ export class RealtimeWeatherWorld implements World {
   private async push(type: string, text: string): Promise<void> {
     await this.host!.pushEvent({ type, source: this.id, senderKey: this.id, origin: 'external', ts: nowIso(this.ctx.timezone), text });
   }
-  private schedule(run: () => Promise<void>, interval: number): void {
+  private schedule(kind: WeatherSchedule): void {
+    clearTimeout(this.schedules.get(kind));
+    const cfg = this.ctx.cfg;
+    const now = this.now();
+    const interval = kind === 'current' ? cfg.currentIntervalMinutes : cfg.forecastIntervalMinutes;
+    const at = kind === 'daily' ? nextDailyForecastAt(now, this.timezone(), cfg.dailyForecastTime)
+      : cfg.alignChecksToClock ? nextAlignedCheckAt(now, this.timezone(), interval) : now + interval * 60_000;
     const timer = setTimeout(() => {
-      this.timers.delete(timer);
-      if (!this.host) return;
-      const task = run().catch(() => { this.host?.log.warn('天气轮询未完成'); }).finally(() => { this.tasks.delete(task); if (this.host) this.schedule(run, interval); });
+      const poll = kind === 'current' ? this.pollCurrent() : this.pollForecast(kind === 'daily' ? 'summary' : 'changes');
+      const task = poll.catch(() => { this.host?.log.warn('天气轮询未完成'); }).finally(() => {
+        this.tasks.delete(task);
+        if (this.schedules.get(kind) === timer) this.schedule(kind);
+      });
       this.tasks.add(task);
-    }, interval);
-    timer.unref(); this.timers.add(timer);
-  }
-  private scheduleDailyForecast(): void {
-    const timer = setTimeout(() => {
-      this.timers.delete(timer);
-      if (!this.host) return;
-      const task = this.pollForecast('summary')
-        .catch(() => { this.host?.log.warn('每日预报未完成'); })
-        .finally(() => { this.tasks.delete(task); if (this.host) this.scheduleDailyForecast(); });
-      this.tasks.add(task);
-    }, nextDailyForecastAt(this.now(), this.timezone()) - this.now());
-    timer.unref(); this.timers.add(timer);
+    }, at - now);
+    timer.unref();
+    this.schedules.set(kind, timer);
   }
   private scheduleSolar(): void {
     if (!this.ctx.cfg.location || !this.host) return;
@@ -341,10 +341,10 @@ export class RealtimeWeatherWorld implements World {
       type: 'realtime-weather.summary', senderKey: this.id, origin: 'external',
       render: () => this.host === host ? [this.currentReceipt(this.current!, 'passive'), this.forecastReceipt(this.forecast!, 'passive')].join('\n\n') : null,
     });
-    this.schedule(() => this.pollCurrent(), REALTIME_WEATHER_CURRENT_INTERVAL_MS);
-    this.schedule(() => this.pollForecast(), REALTIME_WEATHER_FORECAST_INTERVAL_MS);
+    this.schedule('current');
+    this.schedule('forecast');
+    this.schedule('daily');
     this.scheduleSolar();
-    this.scheduleDailyForecast();
     this.initialized = true;
   }
   async start(host: WorldHost): Promise<void> {
@@ -356,6 +356,8 @@ export class RealtimeWeatherWorld implements World {
   }
   async stop(): Promise<void> {
     this.host = undefined; this.initialized = false; this.controller.abort();
+    for (const timer of this.schedules.values()) clearTimeout(timer);
+    this.schedules.clear();
     for (const timer of this.timers) clearTimeout(timer);
     this.timers.clear(); this.ambience.stop();
     await Promise.allSettled([...this.tasks]);
@@ -386,7 +388,13 @@ export class RealtimeWeatherWorld implements World {
           if ('error' in result) throw new Error(result.error);
           const value = result.values[path];
           if (key === 'apiHost' && value) apiBase(String(value));
+          if (key === 'dailyForecastTime' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value))) throw new Error('请输入 24 小时时间，如 08:00');
           this.ctx.persist({ [key]: value });
+          if (this.initialized) {
+            if (key === 'currentIntervalMinutes' || key === 'alignChecksToClock') this.schedule('current');
+            if (key === 'forecastIntervalMinutes' || key === 'alignChecksToClock') this.schedule('forecast');
+            if (key === 'dailyForecastTime') this.schedule('daily');
+          }
           if (key === 'apiHost') await this.ctx.restart();
           return { ok: true };
         }

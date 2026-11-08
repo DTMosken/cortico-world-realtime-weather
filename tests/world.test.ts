@@ -502,6 +502,28 @@ describe('实况与预报合并', () => {
     expect(fixture.events[0].text).toContain('UV最高7');
   });
 
+  it('配置页重排等待中的实况和每日预报，保留实况变化基线', async () => {
+    fixture = await service();
+    fixture.now = Date.parse('2026-10-31T10:07:00+11:00');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      await fixture.start();
+      const save = (key: string, value: unknown) => fixture!.world.webUi().invoke!('config', 'save', [key, value]);
+      await save('currentIntervalMinutes', 30);
+      await save('alignChecksToClock', true);
+      await save('dailyForecastTime', '10:30');
+      fixture.current = weather({ temperature: { value: 32 } });
+      fixture.events.length = 0;
+      fixture.now += 22 * 60_000;
+      await vi.advanceTimersByTimeAsync(22 * 60_000);
+      expect(fixture.counts).toMatchObject({ current: 1, hours: 1 });
+      fixture.now += 60_000;
+      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.waitFor(() => expect(fixture!.events.map(e => e.type).sort()).toEqual(['realtime-weather.changed', 'realtime-weather.forecast']));
+      expect(fixture.counts).toMatchObject({ current: 2, hours: 2 });
+      expect(fixture.restarts).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
   it('每日按保存的地点时区08:00投递完整预报，不受部署时区影响且不要求预测修订', async () => {
     fixture = await service('Asia/Shanghai');
     fixture.now = Date.parse('2026-10-30T20:59:00Z');
