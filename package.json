@@ -2,7 +2,7 @@
   "name": "cortico-world-realtime-weather",
   "version": "0.2.0",
   "type": "module",
-  "description": "实时天气、空气质量、官方预警与天气预报。",
+  "description": "全球实时天气、空气质量、官方预警与天气预报。",
   "license": "MIT",
   "engines": {
     "node": ">=22"
@@ -21,8 +21,7 @@
     "describe": "describe.json",
     "tags": [
       "internet",
-      "requires-key",
-      "external-setup"
+      "requires-key"
     ]
   },
   "files": [
