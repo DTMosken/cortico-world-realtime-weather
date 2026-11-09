@@ -18,6 +18,10 @@ export interface RealtimeWeatherConfigSection {
   enabled: boolean;
   apiHost: string;
   location: Location | null;
+  currentIntervalMinutes: number;
+  forecastIntervalMinutes: number;
+  alignChecksToClock: boolean;
+  dailyForecastTime: string;
   forecastDays: number;
   temperatureChange: number;
   windScaleChange: number;
@@ -28,6 +32,7 @@ export interface RealtimeWeatherConfigSection {
 export const REALTIME_WEATHER_SECRET = 'CORTICO_QWEATHER_API_KEY';
 export const REALTIME_WEATHER_DEFAULTS: RealtimeWeatherConfigSection = {
   enabled: false, apiHost: '', location: null, forecastDays: 7,
+  currentIntervalMinutes: 15, forecastIntervalMinutes: 60, alignChecksToClock: false, dailyForecastTime: '08:00',
   temperatureChange: 3, windScaleChange: 2, visibilityThresholdKm: 1,
   precipitationProbabilityChange: 30,
 };
@@ -38,6 +43,10 @@ export function realtimeWeatherConfigGroup(_language?: Language): ConfigGroup {
     schema: { type: 'object', title: '实时天气', properties: {
       'worlds.realtime-weather.apiHost': { type: 'string', title: 'QWeather API Host', 'x-hot': true },
       'worlds.realtime-weather.location': { type: 'object', title: '天气地点', 'x-hot': false },
+      'worlds.realtime-weather.currentIntervalMinutes': { type: 'integer', title: '实况检查间隔', minimum: 1, maximum: 1440, 'x-suffix': '分钟', 'x-hot': true },
+      'worlds.realtime-weather.forecastIntervalMinutes': { type: 'integer', title: '预报检查间隔', minimum: 1, maximum: 1440, 'x-suffix': '分钟', 'x-hot': true },
+      'worlds.realtime-weather.alignChecksToClock': { type: 'boolean', title: '检查时间对齐整点', 'x-hot': true },
+      'worlds.realtime-weather.dailyForecastTime': { type: 'string', title: '每日预报时间', 'x-hot': true },
       'worlds.realtime-weather.forecastDays': { type: 'integer', title: '预报天数', minimum: 1, maximum: 10, 'x-hot': true },
       'worlds.realtime-weather.temperatureChange': { type: 'number', title: '温度变化阈值', minimum: 0.1, 'x-suffix': '°C', 'x-hot': true },
       'worlds.realtime-weather.windScaleChange': { type: 'integer', title: '风力变化阈值', minimum: 1, 'x-suffix': '级', 'x-hot': true },

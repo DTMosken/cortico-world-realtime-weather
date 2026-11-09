@@ -37,14 +37,30 @@ function offsetMinutes(at: number, timezone: string): number {
   const match = /GMT([+-])(\d{2}):(\d{2})/.exec(offsetText);
   return match ? (Number(match[2]) * 60 + Number(match[3])) * (match[1] === '-' ? -1 : 1) : 0;
 }
-export function nextDailyForecastAt(now: number, timezone: string): number {
-  const wall = Date.parse(`${dateKey(now, timezone)}T08:00:00Z`);
-  const resolve = (target: number) => {
-    const candidate = target - offsetMinutes(target, timezone) * 60_000;
-    return target - offsetMinutes(candidate, timezone) * 60_000;
-  };
-  const today = resolve(wall);
-  return today > now ? today : resolve(wall + 24 * 60 * 60_000);
+export function nextAlignedCheckAt(now: number, timezone: string, intervalMinutes: number): number {
+  const localClock = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  // 时间线上逐分钟找当地刻度，夏令时跳过或重复的小时也按表盘计。
+  for (let at = now - now % 60_000 + 60_000; at <= now + 2 * 24 * 60 * 60_000; at += 60_000) {
+    const [hour, minute] = localClock.format(at).split(':').map(Number);
+    if ((hour * 60 + minute) % intervalMinutes === 0) return at;
+  }
+  throw new Error('没有可用的检查时刻');
+}
+export function nextDailyForecastAt(now: number, timezone: string, time: string): number {
+  const day = 24 * 60 * 60_000;
+  const wall = Date.parse(`${dateKey(now, timezone)}T${time}:00Z`);
+  for (let target = wall; target <= wall + 2 * day; target += day) {
+    // 夏令时回拨时取第一次，跳过当天不存在的时刻。
+    const before = offsetMinutes(target - day, timezone);
+    const after = offsetMinutes(target + day, timezone);
+    for (const offset of new Set([Math.max(before, after), Math.min(before, after)])) {
+      const candidate = target - offset * 60_000;
+      if (offsetMinutes(candidate, timezone) !== offset) continue;
+      if (candidate > now) return candidate;
+      break;
+    }
+  }
+  throw new Error('没有可用的每日预报时刻');
 }
 export function solarTimes(at: number, location: Location, timezone: string) {
   return getTimes(new Date(at), location.latitude, location.longitude, 0, offsetMinutes(at, timezone));
