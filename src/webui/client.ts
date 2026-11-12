@@ -58,7 +58,7 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
     const ready = !!state.config.apiHost && state.keySet;
     const buttons = ui.rowbar();
     const keyStatus = ui.pill(state.keySet ? '密钥已配置' : '密钥未配置', state.keySet ? 'on' : 'off');
-    const keyInput = ui.input({ type: 'password', cls: 'mono grow', onCommit: () => saveKey.click() });
+    const keyInput = ui.input({ type: 'password', cls: 'mono', onCommit: () => saveKey.click() });
     const saveKey = ui.button('保存密钥', { size: 'sm', variant: 'primary', onClick: () => {
       if (keyInput.value.trim()) void action('saveKey', [keyInput.value]);
     } });
