@@ -57,11 +57,13 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
     layout.append(sheet.el, locationSheet.el, settings.el, copySheet.el);
     const ready = !!state.config.apiHost && state.keySet;
     const buttons = ui.rowbar();
-    buttons.append(ui.pill(state.keySet ? '密钥已配置' : '密钥未配置', state.keySet ? 'on' : 'off'));
-    const keyInput = ui.input({ type: 'password' });
-    buttons.append(ui.button('保存密钥', { onClick: () => {
+    const keyStatus = ui.pill(state.keySet ? '密钥已配置' : '密钥未配置', state.keySet ? 'on' : 'off');
+    const keyInput = ui.input({ type: 'password', cls: 'mono grow', onCommit: () => saveKey.click() });
+    const saveKey = ui.button('保存密钥', { size: 'sm', variant: 'primary', onClick: () => {
       if (keyInput.value.trim()) void action('saveKey', [keyInput.value]);
-    } }));
+    } });
+    const keyRow = ui.rowbar();
+    keyRow.append(keyInput, saveKey);
     const test = ui.button('测试连接', { onClick: () => {
       test.disabled = true; message = '测试中…'; status.textContent = message;
       void action('testConnection').then(result => {
@@ -111,7 +113,7 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
       parent.append(ui.field(label, control));
     }
     if (settingsMessage) settings.body.append(ui.msgline(settingsMessage, settingsFailed));
-    sheet.body.append(ui.field('QWeather API Key', keyInput), buttons);
+    sheet.body.append(keyStatus, ui.field('QWeather API Key', keyRow), buttons);
     const help = ui.foldSheet('qweather-registration', { title: '如何取得密钥', defaultOpen: false });
     const registration = ui.h('a', null, '注册QWeather账号'); registration.href = 'https://id.qweather.com/'; registration.target = '_blank'; registration.rel = 'noopener noreferrer';
     help.body.append(registration);
