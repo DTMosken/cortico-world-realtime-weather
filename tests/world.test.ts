@@ -8,6 +8,19 @@ import { solarTimes } from '../src/time.ts';
 let fixture: Awaited<ReturnType<typeof service>> | undefined;
 afterEach(async () => { await fixture?.close(); fixture = undefined; });
 
+it('面板保存的新密钥用于下一次天气请求，空输入保留密钥', async () => {
+  fixture = await service();
+  const panel = fixture.world.webUi().invoke!;
+  await panel('config', 'saveKey', ['updated-key']);
+  await panel('config', 'saveKey', ['']);
+  const state = await panel('config', 'state', []);
+  expect(state).toMatchObject({ keySet: true });
+  expect(JSON.stringify(state)).not.toContain('updated-key');
+  await fixture.start();
+  expect(fixture.headerKeys.length).toBeGreaterThan(0);
+  expect(new Set(fixture.headerKeys)).toEqual(new Set(['updated-key']));
+});
+
 describe('实况与预报合并', () => {
   it('实况降水结合强度与累计量，零强度类型波动不报起停', async () => {
     fixture = await service();

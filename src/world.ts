@@ -14,7 +14,7 @@ import { clock, isDaylight, solarTimes, nextAlignedCheckAt, nextDailyForecastAt 
 import { forecastTags, type ForecastSelection } from './forecast.ts';
 import { airStandard, currentLine, dayLine, dayMetrics, forecastLines } from './format.ts';
 import { describesPrecipitation, precipitating, weatherTags, type Air, type Change, type Current, type Day, type Forecast, type Weather } from './model.ts';
-import { ensureParent, openFile, prepareKeyFile } from './files.ts';
+import { ensureParent, openFile } from './files.ts';
 
 const ENV_PROMPT_FILE = fileURLToPath(new URL('./ENV_PROMPT.md', import.meta.url));
 export const REALTIME_WEATHER_CURRENT_INTERVAL_MS = 15 * 60_000;
@@ -412,7 +412,14 @@ export class RealtimeWeatherWorld implements World {
           this.ctx.persist({ location: null });
           this.ctx.persist({ location }); await this.ctx.restart(); return { ok: true };
         }
-        if (method === 'openKeyFile') { await this.open(prepareKeyFile(this.ctx.botDir)); return { ok: true }; }
+        if (method === 'saveKey') {
+          const [value] = args;
+          if (typeof value !== 'string') throw new Error('密钥须为文本');
+          const key = value.trim();
+          if (/\s/.test(key)) throw new Error('密钥不能包含空白字符');
+          if (key) this.ctx.storeSecret(REALTIME_WEATHER_SECRET, key);
+          return { ok: true };
+        }
         if (method === 'openAmbience') { ensureParent(this.ambience.file); this.ambience.ensureFile(); await this.open(this.ambience.file); return { ok: true }; }
         if (method === 'restoreAmbience') { ensureParent(this.ambience.file); this.ambience.restore(); return { ok: true }; }
         if (method === 'testConnection') {

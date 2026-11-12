@@ -6,7 +6,7 @@ Cortico World扩展，使用QWeather获取天气、空气质量、官方预警�
 ## 配置
 
 1. 从WebUI扩展页安装本包，在“实时天气”中填写QWeather控制台提供的API Host。
-2. “打开密钥文件”，在部署`.env`中填写`CORTICO_QWEATHER_API_KEY`并保存。
+2. 在 QWeather API Key 输入框粘贴密钥并保存。
 3. 搜索城市，选择国家、省州和城市相符的结果；区级行政区可选。重名时可填写上级行政区（adm）和国家或地区代码（range，如 cn、au）缩小范围；留空不限制，最多返回20个候选。
 4. 启用World，“测试连接”显示各接口状态和耗时。
 

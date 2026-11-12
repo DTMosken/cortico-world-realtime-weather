@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { WorldContext } from 'cortico/world.ts';
 import type { WorldHost, EventEnvelope } from 'cortico/core/types.ts';
-import { REALTIME_WEATHER_DEFAULTS, type RealtimeWeatherConfigSection } from '../../src/config.ts';
+import { REALTIME_WEATHER_DEFAULTS, REALTIME_WEATHER_SECRET, type RealtimeWeatherConfigSection } from '../../src/config.ts';
 import { RealtimeWeatherWorld } from '../../src/world.ts';
 
 export function weather(overrides: Record<string, unknown> = {}) {
@@ -40,8 +40,9 @@ export async function service(timezone = 'Australia/Sydney', deferEvents = false
   };
   const botDir = mkdtempSync(join(tmpdir(), 'weather-extension-'));
   const cfg: RealtimeWeatherConfigSection = { ...REALTIME_WEATHER_DEFAULTS, apiHost: 'example.qweatherapi.com', location: { name: 'PRIVATE_LOCATION', country: 'Example', province: 'North', city: 'District', latitude: 42.33, longitude: 101.12, timezone: 'Australia/Sydney' } };
+  const secrets = new Map([[REALTIME_WEATHER_SECRET, 'PRIVATE_KEY']]);
   let restarts = 0;
-  const context: WorldContext<RealtimeWeatherConfigSection> = { id: 'realtime-weather', cfg, timezone, botName: 'example', botDir, dataDir: botDir, repoRoot: botDir, packageDir: botDir, secret: () => 'PRIVATE_KEY', storeSecret: () => {}, persist: patch => { Object.assign(cfg, patch); }, restart: async () => { restarts++; } };
+  const context: WorldContext<RealtimeWeatherConfigSection> = { id: 'realtime-weather', cfg, timezone, botName: 'example', botDir, dataDir: botDir, repoRoot: botDir, packageDir: botDir, secret: name => secrets.get(name) ?? '', storeSecret: (name, value) => { secrets.set(name, value); }, persist: patch => { Object.assign(cfg, patch); }, restart: async () => { restarts++; } };
   const events: EventEnvelope[] = [];
   const deferred: Parameters<WorldHost['pushDeferred']>[0][] = [];
   const materialize = async (spec: Parameters<WorldHost['pushDeferred']>[0]) => {
