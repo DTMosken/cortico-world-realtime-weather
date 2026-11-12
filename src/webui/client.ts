@@ -58,7 +58,10 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
     const ready = !!state.config.apiHost && state.keySet;
     const buttons = ui.rowbar();
     buttons.append(ui.pill(state.keySet ? '密钥已配置' : '密钥未配置', state.keySet ? 'on' : 'off'));
-    buttons.append(ui.button('打开密钥文件', { onClick: () => { void action('openKeyFile'); } }));
+    const keyInput = ui.input({ type: 'password' });
+    buttons.append(ui.button('保存密钥', { onClick: () => {
+      if (keyInput.value.trim()) void action('saveKey', [keyInput.value]);
+    } }));
     const test = ui.button('测试连接', { onClick: () => {
       test.disabled = true; message = '测试中…'; status.textContent = message;
       void action('testConnection').then(result => {
@@ -108,7 +111,7 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
       parent.append(ui.field(label, control));
     }
     if (settingsMessage) settings.body.append(ui.msgline(settingsMessage, settingsFailed));
-    sheet.body.append(buttons);
+    sheet.body.append(ui.field('QWeather API Key', keyInput), buttons);
     const help = ui.foldSheet('qweather-registration', { title: '如何取得密钥', defaultOpen: false });
     const registration = ui.h('a', null, '注册QWeather账号'); registration.href = 'https://id.qweather.com/'; registration.target = '_blank'; registration.rel = 'noopener noreferrer';
     help.body.append(registration);
@@ -118,7 +121,7 @@ async function mount(ctx: WebUiPanelContext): Promise<void> {
       '注册并登录后，点击进入「开发服务控制台」。',
       '按提示绑定邮箱和手机号。',
       '进入「项目管理」，创建项目；在项目中添加凭据，认证方式选择「API KEY」。',
-      '复制 API KEY 的完整值。点击上方「打开密钥文件」，填在 CORTICO_QWEATHER_API_KEY= 后面，不加引号，保存文件。',
+      '将凭据粘贴到 QWeather API Key 输入框并保存。',
       '进入开发服务控制台的「设置」，找到并复制 API Host，填入上方的「QWeather API Host」。只填主机名，不加 https://。',
       '搜索并选择城市或区划，然后点击「测试连接」。',
     ]) steps.append(ui.h('li', null, text));
